@@ -1,0 +1,86 @@
+name: Build & Upload to TestFlight
+
+on:
+  push:
+    branches: [master]
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select latest Xcode
+        run: |
+          XCODE=$(ls /Applications | grep -E "^Xcode" | sort -V | tail -1)
+          sudo xcode-select -s /Applications/$XCODE/Contents/Developer
+          xcodebuild -version
+
+      - name: Install certificate and provisioning profiles
+        env:
+          BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
+          P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
+          APP_PROVISION_PROFILE_BASE64: ${{ secrets.APP_PROVISION_PROFILE_BASE64 }}
+          WIDGET_PROVISION_PROFILE_BASE64: ${{ secrets.WIDGET_PROVISION_PROFILE_BASE64 }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          CERT_PATH=$RUNNER_TEMP/certificate.p12
+          APP_PP_PATH=$RUNNER_TEMP/app.mobileprovision
+          WIDGET_PP_PATH=$RUNNER_TEMP/widget.mobileprovision
+          KEYCHAIN_PATH=$RUNNER_TEMP/signing.keychain-db
+
+          echo -n "$BUILD_CERTIFICATE_BASE64" | base64 --decode -o $CERT_PATH
+          echo -n "$APP_PROVISION_PROFILE_BASE64" | base64 --decode -o $APP_PP_PATH
+          echo -n "$WIDGET_PROVISION_PROFILE_BASE64" | base64 --decode -o $WIDGET_PP_PATH
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security import $CERT_PATH -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security list-keychain -d user -s $KEYCHAIN_PATH $(security list-keychain -d user | xargs)
+          echo "--- Certificates in keychain ---"
+          security find-identity -v -p codesigning $KEYCHAIN_PATH
+
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          cp $APP_PP_PATH ~/Library/MobileDevice/Provisioning\ Profiles/app.mobileprovision
+          cp $WIDGET_PP_PATH ~/Library/MobileDevice/Provisioning\ Profiles/widget.mobileprovision
+
+      - name: Build archive
+        run: |
+          xcodebuild archive \
+            -project Sanguine.xcodeproj \
+            -scheme Sanguine \
+            -configuration Release \
+            -destination "generic/platform=iOS" \
+            -archivePath $RUNNER_TEMP/Sanguine.xcarchive \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            DEVELOPMENT_TEAM=4DTYZA3KVS \
+            CURRENT_PROJECT_VERSION=${{ github.run_number }}
+
+      - name: Export IPA
+        run: |
+          xcodebuild -exportArchive \
+            -archivePath $RUNNER_TEMP/Sanguine.xcarchive \
+            -exportOptionsPlist ExportOptions.plist \
+            -exportPath $RUNNER_TEMP/export
+
+      - name: Upload to TestFlight
+        env:
+          API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          API_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          API_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_KEY_BASE64 }}
+        run: |
+          mkdir -p ~/private_keys
+          echo -n "$API_KEY_BASE64" | base64 --decode -o ~/private_keys/AuthKey_${API_KEY_ID}.p8
+          xcrun altool --upload-app \
+            --type ios \
+            --file $RUNNER_TEMP/export/Sanguine.ipa \
+            --apiKey $API_KEY_ID \
+            --apiIssuer $API_ISSUER_ID
+
+      - name: Clean up keychain
+        if: always()
+        run: security delete-keychain $RUNNER_TEMP/signing.keychain-db

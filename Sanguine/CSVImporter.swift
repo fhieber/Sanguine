@@ -1,0 +1,235 @@
+import Foundation
+import SwiftData
+
+/// Import historical data from a CSV file.
+///
+/// Expected CSV format (header row required):
+///   date,reading,dose,note
+///   2024-01-15,2.4,1.25,
+///   2024-01-22,2.8,,felt fine
+///   2024-01-10,,1.0,
+///
+/// - Rows with a `reading` value → imported as `Reading` (dose attached if present)
+/// - Rows with only a `dose` value → imported as `DoseEntry`
+/// - Rows with neither are skipped
+///
+/// Accepted date formats: ISO 8601 (yyyy-MM-dd), dd.MM.yyyy, MM/dd/yyyy
+struct CSVImporter {
+
+    struct ImportResult {
+        var insertedReading: Int = 0
+        var insertedDose: Int = 0
+        var skipped: Int = 0    // duplicates
+        var errors: [String] = []
+    }
+
+    static func importData(from url: URL, into context: ModelContext) throws -> ImportResult {
+        let raw = try String(contentsOf: url, encoding: .utf8)
+        let lines = raw.components(separatedBy: .newlines).map { $0.trimmingCharacters(in: .whitespaces) }
+        guard !lines.isEmpty else { throw ImportError.emptyFile }
+
+        // Parse header
+        let header = parseCSVLine(lines[0].lowercased())
+        guard let dateCol = header.firstIndex(where: { $0.contains("date") }) else {
+            throw ImportError.missingColumns
+        }
+        let readingCol = header.firstIndex(where: { $0.contains("reading") })
+        let doseCol    = header.firstIndex(where: { $0.contains("dose") || $0.contains("dosis") })
+        let noteCol    = header.firstIndex(where: { $0.contains("note") })
+
+        if readingCol == nil && doseCol == nil { throw ImportError.missingColumns }
+
+        // Fetch existing externalIDs to detect duplicates
+        let existingReadings = try context.fetch(FetchDescriptor<Reading>())
+        let existingDoses    = try context.fetch(FetchDescriptor<DoseEntry>())
+        var knownReadings = Set(existingReadings.compactMap(\.externalID))
+        var knownDoses    = Set(existingDoses.compactMap(\.externalID))
+
+        var result = ImportResult()
+        let parsers = Self.dateParsers
+
+        for (lineIndex, line) in lines.dropFirst().enumerated() {
+            guard !line.isEmpty else { continue }
+            let cols = Self.parseCSVLine(line)
+
+            guard dateCol < cols.count else {
+                result.errors.append("Line \(lineIndex + 2): too few columns")
+                continue
+            }
+
+            let rawDate = cols[dateCol].trimmingCharacters(in: .whitespaces)
+            guard let date = Self.parseDate(rawDate, using: parsers) else {
+                result.errors.append("Line \(lineIndex + 2): unrecognized date '\(rawDate)'")
+                continue
+            }
+
+            let rawReading = readingCol.flatMap { $0 < cols.count ? cols[$0].trimmingCharacters(in: .whitespaces) : nil } ?? ""
+            let rawDose    = doseCol.flatMap    { $0 < cols.count ? cols[$0].trimmingCharacters(in: .whitespaces) : nil } ?? ""
+            let note       = noteCol.flatMap    { $0 < cols.count ? cols[$0].trimmingCharacters(in: .whitespaces) : nil } ?? ""
+
+            let readingValue = Double(rawReading.replacingOccurrences(of: ",", with: "."))
+            let doseValue    = Double(rawDose.replacingOccurrences(of: ",", with: "."))
+
+            if readingValue == nil && doseValue == nil { continue }
+
+            if let rv = readingValue {
+                // Reading row — attach dose if present
+                let externalID = "\(rawDate)_\(rawReading)"
+                if knownReadings.contains(externalID) {
+                    result.skipped += 1
+                } else {
+                    let r = Reading(value: rv, recordedAt: date, note: note, dose: doseValue, externalID: externalID)
+                    context.insert(r)
+                    knownReadings.insert(externalID)
+                    result.insertedReading += 1
+                }
+                // Also insert a DoseEntry when dose is present on a reading row
+                if let dose = doseValue {
+                    let doseExternalID = "\(rawDate)_dose_\(rawDose)"
+                    if !knownDoses.contains(doseExternalID) {
+                        let e = DoseEntry(date: date, dose: dose, note: note, externalID: doseExternalID)
+                        context.insert(e)
+                        knownDoses.insert(doseExternalID)
+                        result.insertedDose += 1
+                    }
+                }
+            } else if let dose = doseValue {
+                // Dose-only row
+                let externalID = "\(rawDate)_dose_\(rawDose)"
+                if knownDoses.contains(externalID) {
+                    result.skipped += 1
+                } else {
+                    let e = DoseEntry(date: date, dose: dose, note: note, externalID: externalID)
+                    context.insert(e)
+                    knownDoses.insert(externalID)
+                    result.insertedDose += 1
+                }
+            }
+        }
+
+        return result
+    }
+
+    // MARK: - Private helpers
+
+    /// Parse a single CSV line respecting RFC 4180 quoting (handles commas inside quoted fields).
+    private static func parseCSVLine(_ line: String) -> [String] {
+        var fields: [String] = []
+        var current = ""
+        var inQuotes = false
+        var i = line.startIndex
+
+        while i < line.endIndex {
+            let ch = line[i]
+            if inQuotes {
+                if ch == "\"" {
+                    let next = line.index(after: i)
+                    if next < line.endIndex && line[next] == "\"" {
+                        // Escaped quote
+                        current.append("\"")
+                        i = line.index(after: next)
+                        continue
+                    } else {
+                        inQuotes = false
+                    }
+                } else {
+                    current.append(ch)
+                }
+            } else {
+                if ch == "\"" {
+                    inQuotes = true
+                } else if ch == "," {
+                    fields.append(current.trimmingCharacters(in: .whitespaces))
+                    current = ""
+                } else {
+                    current.append(ch)
+                }
+            }
+            i = line.index(after: i)
+        }
+        fields.append(current.trimmingCharacters(in: .whitespaces))
+        return fields
+    }
+
+    private static var isoDateTimeParser: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime]
+        return f
+    }()
+
+    private static var dateParsers: [DateFormatter] {
+        let formats = ["yyyy-MM-dd", "dd.MM.yyyy", "MM/dd/yyyy", "dd-MM-yyyy"]
+        return formats.map { fmt in
+            let f = DateFormatter()
+            f.dateFormat = fmt
+            f.locale = Locale(identifier: "en_US_POSIX")
+            return f
+        }
+    }
+
+    private static func parseDate(_ string: String, using parsers: [DateFormatter]) -> Date? {
+        // Try full ISO 8601 datetime first (e.g. "2024-10-22T18:42:07+02:00")
+        if string.contains("T"), let d = isoDateTimeParser.date(from: string) {
+            return d
+        }
+        // Date-only strings: parse then set to 08:00 CET
+        for parser in parsers {
+            if let d = parser.date(from: string) {
+                return dateAt8amCET(d)
+            }
+        }
+        return nil
+    }
+
+    private static func dateAt8amCET(_ date: Date) -> Date {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(identifier: "Europe/Berlin") ?? .current
+        var components = cal.dateComponents([.year, .month, .day], from: date)
+        components.hour = 8
+        components.minute = 0
+        components.second = 0
+        return cal.date(from: components) ?? date
+    }
+
+    // MARK: - Export
+
+    static func exportCSV(readings: [Reading], doseEntries: [DoseEntry]) -> String {
+        let df = ISO8601DateFormatter()
+        df.formatOptions = [.withInternetDateTime]
+        let cal = Calendar.current
+        var lines = ["date,reading,dose,note"]
+
+        // Readings — include embedded dose if present
+        for r in readings.sorted(by: { $0.recordedAt < $1.recordedAt }) {
+            let note = r.note.replacingOccurrences(of: ",", with: ";")
+            let dose = r.dose.map { $0.doseFormatted } ?? ""
+            lines.append("\(df.string(from: r.recordedAt)),\(r.value),\(dose),\(note)")
+        }
+
+        // Build a set of days where a reading already carries a dose value
+        let readingDaysWithDose = Set(
+            readings.compactMap { $0.dose != nil ? cal.startOfDay(for: $0.recordedAt) : nil }
+        )
+
+        // Dose-only entries: export unless the same day's reading already has the dose embedded
+        for e in doseEntries.sorted(by: { $0.date < $1.date }) {
+            guard !readingDaysWithDose.contains(cal.startOfDay(for: e.date)) else { continue }
+            let note = e.note.replacingOccurrences(of: ",", with: ";")
+            lines.append("\(df.string(from: e.date)),,\(e.dose.doseFormatted),\(note)")
+        }
+
+        return lines.joined(separator: "\n")
+    }
+
+    enum ImportError: LocalizedError {
+        case emptyFile
+        case missingColumns
+
+        var errorDescription: String? {
+            switch self {
+            case .emptyFile: return "The file is empty."
+            case .missingColumns: return "CSV must have a 'date' column and at least 'reading' or 'dose'."
+            }
+        }
+    }
+}

@@ -1,0 +1,16 @@
+# macOS
+.DS_Store
+.history
+
+# Xcode
+Sanguine.xcodeproj/xcuserdata/
+Sanguine.xcodeproj/project.xcworkspace/xcuserdata/
+*.xcuserstate
+DerivedData/
+*.xccheckout
+*.moved-aside
+
+# Build
+build/
+*.o
+*.d

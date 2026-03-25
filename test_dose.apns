@@ -1,0 +1,12 @@
+{
+    "Simulator Target Bundle": "com.fhieber.Sanguine",
+    "aps": {
+        "alert": {
+            "title": "Dose Reminder",
+            "body": "Time to take 1.5 tablets"
+        },
+        "sound": "default",
+        "category": "DOSE_REMINDER",
+        "interruption-level": "time-sensitive"
+    }
+}

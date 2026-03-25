@@ -1,0 +1,12 @@
+{
+    "Simulator Target Bundle": "com.fhieber.Sanguine",
+    "aps": {
+        "alert": {
+            "title": "Time to check your INR",
+            "body": "Tap to record today's measurement."
+        },
+        "sound": "default",
+        "category": "inr-weekly-reminder",
+        "interruption-level": "time-sensitive"
+    }
+}

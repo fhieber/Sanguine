@@ -26,6 +26,7 @@ struct SettingsView: View {
     @State private var importResult: String? = nil
     @State private var showingImportAlert = false
     @State private var showingDeleteConfirm = false
+    @State private var showingDemoConfirm = false
     @State private var exportFile: ExportFile? = nil
 
     @FocusState private var isTargetFocused: Bool
@@ -139,6 +140,7 @@ struct SettingsView: View {
                 Section {
                     Button("Import") { showingFilePicker = true }
                     Button("Export") { exportFile = ExportFile(url: makeExportURL()) }
+                    Button("Load Demo Data") { showingDemoConfirm = true }
                     Button("Delete All Data", role: .destructive) { showingDeleteConfirm = true }
                 } header: {
                     Text("Data")
@@ -197,6 +199,12 @@ struct SettingsView: View {
                 } message: {
                     Text("This will permanently remove all readings and dose entries.")
                 }
+                .confirmationDialog("Load Demo Data?", isPresented: $showingDemoConfirm, titleVisibility: .visible) {
+                    Button("Load Demo Data", role: .destructive) { loadDemoData() }
+                    Button("Cancel", role: .cancel) {}
+                } message: {
+                    Text("This will delete all existing data and replace it with generated sample data.")
+                }
                 .sheet(item: $exportFile) { file in
                     ActivityView(url: file.url)
                 }
@@ -253,6 +261,57 @@ struct SettingsView: View {
     private var dataLatestDate: Date? {
         let dates = readings.map(\.recordedAt) + doseEntries.map(\.date)
         return dates.max()
+    }
+
+    private func loadDemoData() {
+        // Clear existing data
+        readings.forEach    { modelContext.delete($0) }
+        doseEntries.forEach { modelContext.delete($0) }
+
+        // Box-Muller Gaussian sampler
+        func gaussian(mean: Double, sigma: Double) -> Double {
+            let u1 = Double.random(in: .leastNormalMagnitude...1)
+            let u2 = Double.random(in: 0...1)
+            return mean + sigma * sqrt(-2 * log(u1)) * cos(2 * .pi * u2)
+        }
+
+        let cal = Calendar.current
+        let now = Date()
+        let mean = 8.0
+        let sigma = 0.7
+
+        // ~40 readings weekly over the past 9 months, with slight date jitter
+        var generatedReadings: [Reading] = []
+        for week in stride(from: -38, through: 0, by: 1) {
+            guard let baseDate = cal.date(byAdding: .weekOfYear, value: week, to: now) else { continue }
+            let jitter = TimeInterval.random(in: -86400...86400)
+            let date = baseDate.addingTimeInterval(jitter)
+            guard date <= now else { continue }
+            let value = max(4, min(12, gaussian(mean: mean, sigma: sigma)))
+            let dose = max(1, min(6, gaussian(mean: 3.5, sigma: 0.5)))
+            let r = Reading(value: (value * 10).rounded() / 10, recordedAt: date)
+            r.dose = (dose * 4).rounded() / 4
+            generatedReadings.append(r)
+            modelContext.insert(r)
+
+            // Dose entries between readings
+            if let nextWeek = cal.date(byAdding: .day, value: 3, to: date), nextWeek <= now {
+                let midDose = max(1, min(6, gaussian(mean: 3.5, sigma: 0.5)))
+                let entry = DoseEntry(date: nextWeek, dose: (midDose * 4).rounded() / 4)
+                entry.isPlanned = false
+                modelContext.insert(entry)
+            }
+        }
+
+        // Set target range to cover ~95% of data (mean ± 2σ of actual generated values)
+        let values = generatedReadings.map(\.value)
+        let actualMean = values.reduce(0, +) / Double(values.count)
+        let actualSigma = sqrt(values.map { pow($0 - actualMean, 2) }.reduce(0, +) / Double(values.count))
+        lowTarget  = (max(0, actualMean - 2 * actualSigma) * 10).rounded() / 10
+        highTarget = ((actualMean + 2 * actualSigma) * 10).rounded() / 10
+
+        try? modelContext.save()
+        WidgetCenter.shared.reloadAllTimelines()
     }
 
     private func deleteAllData() {

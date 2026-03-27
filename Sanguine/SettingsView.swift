@@ -141,6 +141,7 @@ struct SettingsView: View {
                     Button("Import") { showingFilePicker = true }
                     Button("Export") { exportFile = ExportFile(url: makeExportURL()) }
                     Button("Load Demo Data") { showingDemoConfirm = true }
+                        .disabled(!readings.isEmpty || !doseEntries.isEmpty)
                     Button("Delete All Data", role: .destructive) { showingDeleteConfirm = true }
                 } header: {
                     Text("Data")
@@ -264,10 +265,6 @@ struct SettingsView: View {
     }
 
     private func loadDemoData() {
-        // Clear existing data
-        readings.forEach    { modelContext.delete($0) }
-        doseEntries.forEach { modelContext.delete($0) }
-
         // Box-Muller Gaussian sampler
         func gaussian(mean: Double, sigma: Double) -> Double {
             let u1 = Double.random(in: .leastNormalMagnitude...1)

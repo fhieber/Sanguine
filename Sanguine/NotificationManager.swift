@@ -19,11 +19,11 @@ final class NotificationManager: Sendable {
         }
     }
 
-    /// Register the "Administered" action category. Call once at launch.
+    /// Register the "Applied" action category. Call once at launch.
     func registerNotificationCategories() {
         let markTaken = UNNotificationAction(
             identifier: Self.markTakenActionID,
-            title: "Administered",
+            title: "Applied",
             options: []
         )
         let doseCategory = UNNotificationCategory(
@@ -64,7 +64,7 @@ final class NotificationManager: Sendable {
 
         let content = UNMutableNotificationContent()
         content.title = "Dose Reminder"
-        content.body  = "Time to take your dose (\(dose.doseFormatted))"
+        content.body  = "Time to apply your dose (\(dose.doseFormatted))"
         content.sound = .default
         content.categoryIdentifier  = Self.doseCategoryID
         content.interruptionLevel   = .timeSensitive

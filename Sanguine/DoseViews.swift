@@ -401,7 +401,7 @@ struct DoseDetailView: View {
                         WidgetCenter.shared.reloadAllTimelines()
                         dismiss()
                     } label: {
-                        Text("Administered")
+                        Text("Applied")
                             .font(.headline)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 6)

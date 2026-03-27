@@ -11,7 +11,7 @@ struct SanguineEntry: TimelineEntry {
     let readingInRange: Bool?
     let todayDose: Double?
     let todayDoseTime: String?   // formatted time string for planned dose
-    let todayDoseTaken: Bool     // true if dose already taken today
+    let todayDoseTaken: Bool     // true if dose already applied today
 }
 
 // MARK: - Timeline Provider
@@ -134,7 +134,7 @@ struct SanguineWidgetEntryView: View {
             // Row 2: Today's dose — taps to open dose detail
             Link(destination: URL(string: "medtracker://dose-detail")!) {
                 HStack(spacing: 8) {
-                    Image(systemName: entry.todayDoseTaken ? "checkmark.circle.fill" : (entry.todayDose != nil ? "pills.fill" : "exclamationmark.circle.fill"))
+                    Image(systemName: entry.todayDoseTaken ? "checkmark.circle.fill" : (entry.todayDose != nil ? "calendar.badge.checkmark" : "exclamationmark.circle.fill"))
                         .foregroundStyle(entry.todayDoseTaken ? .green : (entry.todayDose != nil ? .primary : .red))
                         .font(isSmall ? .body : .title2)
                     VStack(alignment: .leading, spacing: 1) {

@@ -246,7 +246,7 @@ struct ReadingDetailView: View {
                 } header: {
                     Text("Prior 6 Doses")
                 } footer: {
-                    Text("Doses taken before this reading")
+                    Text("Doses applied before this reading")
                         .font(.caption2)
                 }
             }

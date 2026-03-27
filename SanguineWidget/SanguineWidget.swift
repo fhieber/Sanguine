@@ -71,7 +71,7 @@ struct SanguineProvider: TimelineProvider {
             let allDoses = (try? ctx.fetch(FetchDescriptor<DoseEntry>())) ?? []
             if let entry = allDoses.first(where: { Calendar.current.isDateInToday($0.date) }) {
                 todayDose = entry.dose
-                if entry.isPlanned == true {
+                if entry.isPlanned != false {
                     todayDoseTime = widgetDoseTimeLabel(hour: doseHour, minute: doseMinute, timezoneID: tzID)
                     todayDoseTaken = false
                 } else {

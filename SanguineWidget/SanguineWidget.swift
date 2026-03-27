@@ -109,7 +109,7 @@ struct SanguineWidgetEntryView: View {
                         .foregroundStyle(entry.readingInRange == false ? .red : .green)
                         .font(isSmall ? .body : .title2)
                     VStack(alignment: .leading, spacing: 1) {
-                        Text("Reading")
+                        Text("Last Reading")
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                         HStack(alignment: .firstTextBaseline, spacing: 4) {

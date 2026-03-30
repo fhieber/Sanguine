@@ -18,6 +18,14 @@ jobs:
           sudo xcode-select -s /Applications/$XCODE/Contents/Developer
           xcodebuild -version
 
+      - name: Run unit tests
+        run: |
+          xcodebuild test \
+            -project Sanguine.xcodeproj \
+            -scheme Sanguine \
+            -destination "platform=iOS Simulator,name=iPhone 16" \
+            -only-testing:SanguineTests
+
       - name: Install certificate and provisioning profiles
         env:
           BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}

@@ -1,6 +1,6 @@
 import XCTest
 import SwiftData
- import Sanguine
+@testable import Sanguine
 
 // MARK: - Helpers
 

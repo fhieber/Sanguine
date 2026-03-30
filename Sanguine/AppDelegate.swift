@@ -15,6 +15,7 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         UNUserNotificationCenter.current().delegate = self
         NotificationManager.shared.registerNotificationCategories()
         modelContainer = try? makeSharedModelContainer()
+        UNUserNotificationCenter.current().setBadgeCount(0) { _ in }
         return true
     }
 
@@ -33,6 +34,7 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         didReceive response: UNNotificationResponse,
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
+        UNUserNotificationCenter.current().setBadgeCount(0) { _ in }
         if response.actionIdentifier == NotificationManager.markTakenActionID {
             markTodaysDoseAsTaken()
         } else if response.notification.request.content.categoryIdentifier == NotificationManager.readingReminderID {

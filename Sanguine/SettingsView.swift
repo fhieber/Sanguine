@@ -233,8 +233,16 @@ struct SettingsView: View {
     }
 
     private func scheduleDoseReminderIfNeeded() {
-        if !doseReminderEnabled {
+        guard doseReminderEnabled else {
             NotificationManager.shared.cancelPlannedDoseNotification()
+            return
+        }
+        if let dose = doseEntries.first(where: {
+            $0.isPlanned != false && Calendar.current.isDateInToday($0.date)
+        }) {
+            NotificationManager.shared.schedulePlannedDoseNotification(
+                dose: dose.dose, hour: doseHour, minute: doseMinute, timezoneID: doseTimezoneID
+            )
         }
     }
 

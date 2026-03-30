@@ -330,6 +330,7 @@ struct DoseStatsGrid: View {
 struct DoseDetailView: View {
     @Bindable var entry: DoseEntry
     @Query(sort: \Reading.recordedAt) private var allReadings: [Reading]
+    @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @AppStorage("doseTimeHour", store: .appGroup) private var doseHour: Int = 18
     @AppStorage("doseTimeMinute", store: .appGroup) private var doseMinute: Int = 0
@@ -397,6 +398,7 @@ struct DoseDetailView: View {
                     Button {
                         entry.isPlanned = false
                         entry.date = .now
+                        try? modelContext.save()
                         NotificationManager.shared.cancelPlannedDoseNotification()
                         WidgetCenter.shared.reloadAllTimelines()
                         dismiss()

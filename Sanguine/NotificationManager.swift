@@ -93,7 +93,7 @@ final class NotificationManager: Sendable {
                     content: content,
                     trigger: trigger
                 )
-                center.add(request)
+                try? await center.add(request)
                 fireDate  = fireDate.addingTimeInterval(interval)
                 index    += 1
             }

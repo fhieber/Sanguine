@@ -205,8 +205,8 @@ struct DoseTab: View {
             .onReceive(NotificationCenter.default.publisher(for: .navigateToDoseDetail)) { _ in
                 handleDeepLinkIfNeeded()
             }
+            .task { scheduleTodayNotification() }
             .onChange(of: todaysDose) { scheduleTodayNotification() }
-            .onAppear(perform: scheduleTodayNotification)
         }
     }
 

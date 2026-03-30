@@ -41,59 +41,72 @@ final class NotificationManager: Sendable {
         UNUserNotificationCenter.current().setNotificationCategories([doseCategory, readingCategory])
     }
 
+    // iOS caps pending notifications at 64; reserve 1 slot for the reading reminder.
+    private static let maxDoseNotifications = 63
+
     /// Schedule time-sensitive notifications for today's planned dose, starting at the user's
     /// configured time and repeating every 15 minutes until midnight. Notifications break through
     /// Focus modes and notification summaries. Does nothing if the time has already passed today.
     func schedulePlannedDoseNotification(dose: Double, hour: Int, minute: Int, timezoneID: String) {
-        cancelPlannedDoseNotification()
-
-        let tz = TimeZone(identifier: timezoneID) ?? .current
-        var cal = Calendar(identifier: .gregorian)
-        cal.timeZone = tz
-
-        var components = cal.dateComponents([.year, .month, .day], from: .now)
-        components.hour = hour; components.minute = minute; components.second = 0
-        guard let startDate = cal.date(from: components) else { return }
-
-        // If the configured time already passed, start from now + 1 min
-        let firstFire = startDate > .now ? startDate : Date(timeIntervalSinceNow: 60)
-
-        // Midnight in the user's timezone
-        let tomorrow = cal.startOfDay(for: cal.date(byAdding: .day, value: 1, to: .now)!)
-        guard firstFire < tomorrow else { return }
-
-        let content = UNMutableNotificationContent()
-        content.title = "Dose Reminder"
-        content.body  = "Time to apply your dose (\(dose.doseFormatted))"
-        content.sound = .default
-        content.categoryIdentifier  = Self.doseCategoryID
-        content.interruptionLevel   = .timeSensitive
-
         let center = UNUserNotificationCenter.current()
-        var fireDate = firstFire
-        var index = 0
-        let interval: TimeInterval = 15 * 60
 
-        while fireDate < tomorrow {
-            let trigger = UNTimeIntervalNotificationTrigger(
-                timeInterval: fireDate.timeIntervalSinceNow,
-                repeats: false
-            )
-            let request = UNNotificationRequest(
-                identifier: "\(Self.dosePlanIDPrefix)-\(index)",
-                content: content,
-                trigger: trigger
-            )
-            center.add(request)
-            fireDate  = fireDate.addingTimeInterval(interval)
-            index    += 1
+        Task {
+            // Cancel any existing dose notifications before scheduling new ones.
+            let pending = await center.pendingNotificationRequests()
+            let oldIDs  = pending.map(\.identifier).filter { $0.hasPrefix(Self.dosePlanIDPrefix) }
+            center.removePendingNotificationRequests(withIdentifiers: oldIDs)
+
+            let tz = TimeZone(identifier: timezoneID) ?? .current
+            var cal = Calendar(identifier: .gregorian)
+            cal.timeZone = tz
+
+            var components = cal.dateComponents([.year, .month, .day], from: .now)
+            components.hour = hour; components.minute = minute; components.second = 0
+            guard let startDate = cal.date(from: components) else { return }
+
+            // If the configured time already passed, start from now + 1 min
+            let firstFire = startDate > .now ? startDate : Date(timeIntervalSinceNow: 60)
+
+            // Midnight in the user's timezone
+            let tomorrow = cal.startOfDay(for: cal.date(byAdding: .day, value: 1, to: .now)!)
+            guard firstFire < tomorrow else { return }
+
+            let content = UNMutableNotificationContent()
+            content.title = "Dose Reminder"
+            content.body  = "Time to apply your dose (\(dose.doseFormatted))"
+            content.sound = .default
+            content.categoryIdentifier  = Self.doseCategoryID
+            content.interruptionLevel   = .timeSensitive
+
+            var fireDate = firstFire
+            var index = 0
+            let interval: TimeInterval = 15 * 60
+
+            while fireDate < tomorrow {
+                guard index < Self.maxDoseNotifications else { break }
+                let trigger = UNTimeIntervalNotificationTrigger(
+                    timeInterval: fireDate.timeIntervalSinceNow,
+                    repeats: false
+                )
+                let request = UNNotificationRequest(
+                    identifier: "\(Self.dosePlanIDPrefix)-\(index)",
+                    content: content,
+                    trigger: trigger
+                )
+                center.add(request)
+                fireDate  = fireDate.addingTimeInterval(interval)
+                index    += 1
+            }
         }
     }
 
     func cancelPlannedDoseNotification() {
-        // Derive the max possible count (every 15 min over 24 h = 96; use 100 as safe ceiling)
-        let identifiers = (0..<100).map { "\(Self.dosePlanIDPrefix)-\($0)" }
-        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: identifiers)
+        let center = UNUserNotificationCenter.current()
+        Task {
+            let pending = await center.pendingNotificationRequests()
+            let ids = pending.map(\.identifier).filter { $0.hasPrefix(Self.dosePlanIDPrefix) }
+            center.removePendingNotificationRequests(withIdentifiers: ids)
+        }
     }
 
     // MARK: - Reading Reminder

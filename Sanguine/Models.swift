@@ -133,10 +133,9 @@ func upsertPlannedDays(_ days: [PlannedDay], doses: [DoseEntry], into context: M
 
 // MARK: - Demo Data
 
-/// Generates synthetic demo readings and dose entries, inserts them into `context`,
-/// and returns the inserted readings (so callers can derive statistics like target range).
-@discardableResult
-func generateDemoData(into context: ModelContext) -> [Reading] {
+/// Generates synthetic demo readings and dose entries without inserting them anywhere.
+/// Returns `(readings, doses)` so callers can use or insert them as needed.
+func generateDemoData() -> (readings: [Reading], doses: [DoseEntry]) {
     func gaussian(mean: Double, sigma: Double) -> Double {
         let u1 = Double.random(in: .leastNormalMagnitude...1)
         let u2 = Double.random(in: 0...1)
@@ -148,7 +147,8 @@ func generateDemoData(into context: ModelContext) -> [Reading] {
     let mean = 8.0
     let sigma = 0.7
     let meanDose = 3.5
-    var generatedReadings: [Reading] = []
+    var readings: [Reading] = []
+    var doses: [DoseEntry] = []
     var prevDose = meanDose
 
     for week in stride(from: -38, through: 0, by: 1) {
@@ -167,19 +167,28 @@ func generateDemoData(into context: ModelContext) -> [Reading] {
 
         let r = Reading(value: roundedValue, recordedAt: date)
         r.dose = roundedDose
-        generatedReadings.append(r)
-        context.insert(r)
+        readings.append(r)
         prevDose = roundedDose
 
         if let midDate = cal.date(byAdding: .day, value: 3, to: date), midDate <= now {
             let midDose = max(1, min(6, gaussian(mean: roundedDose, sigma: 0.2)))
             let entry = DoseEntry(date: midDate, dose: (midDose * 4).rounded() / 4)
             entry.isPlanned = false
-            context.insert(entry)
+            doses.append(entry)
         }
     }
 
-    return generatedReadings
+    return (readings, doses)
+}
+
+/// Generates synthetic demo readings and dose entries, inserts them into `context`,
+/// and returns the inserted readings (so callers can derive statistics like target range).
+@discardableResult
+func generateDemoData(into context: ModelContext) -> [Reading] {
+    let (readings, doses) = generateDemoData()
+    readings.forEach { context.insert($0) }
+    doses.forEach { context.insert($0) }
+    return readings
 }
 
 // MARK: - Statistics Helpers

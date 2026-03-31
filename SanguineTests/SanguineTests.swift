@@ -342,6 +342,22 @@ final class CSVDateParsingTests: XCTestCase {
     }
 }
 
+// MARK: - CSV Export Tests (no simulator required)
+
+final class CSVExportTests: XCTestCase {
+
+    /// Generate random demo data, export to CSV, re-parse, re-export, and assert both CSVs match.
+    func testRandomRoundtrip() throws {
+        let (readings, doses) = generateDemoData()
+        let csv1 = CSVImporter.exportCSV(readings: readings, doseEntries: doses)
+
+        let (parsedReadings, parsedDoses) = try CSVImporter.parseCSV(csv1)
+        let csv2 = CSVImporter.exportCSV(readings: parsedReadings, doseEntries: parsedDoses)
+
+        XCTAssertEqual(csv1, csv2)
+    }
+}
+
 // MARK: - CSV Roundtrip Tests
 
 final class CSVRoundtripTests: XCTestCase {
@@ -402,28 +418,6 @@ final class CSVRoundtripTests: XCTestCase {
         let doseOnly = try XCTUnwrap(importedDoses.first { abs($0.date.timeIntervalSince1970 - date3.timeIntervalSince1970) < 1 })
         XCTAssertEqual(doseOnly.dose, 1.5, accuracy: 0.001)
         XCTAssertEqual(doseOnly.note, d1.note)
-    }
-
-    func testRandomRoundtrip() throws {
-        // Generate demo data into context1 and export to CSV
-        let context1 = try makeContext()
-        let generatedReadings = generateDemoData(into: context1)
-        let generatedDoses    = try context1.fetch(FetchDescriptor<DoseEntry>())
-        let csv1 = CSVImporter.exportCSV(readings: generatedReadings, doseEntries: generatedDoses)
-
-        // Import that CSV into a fresh context and re-export
-        let context2 = try makeContext()
-        let url = FileManager.default.temporaryDirectory
-            .appendingPathComponent(UUID().uuidString + ".csv")
-        try csv1.write(to: url, atomically: true, encoding: .utf8)
-        let result = try CSVImporter.importData(from: url, into: context2)
-        XCTAssertTrue(result.errors.isEmpty, "Import errors: \(result.errors)")
-
-        let readings2 = try context2.fetch(FetchDescriptor<Reading>())
-        let doses2    = try context2.fetch(FetchDescriptor<DoseEntry>())
-        let csv2 = CSVImporter.exportCSV(readings: readings2, doseEntries: doses2)
-
-        XCTAssertEqual(csv1, csv2)
     }
 
     func testDeduplication() throws {

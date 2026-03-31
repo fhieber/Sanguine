@@ -191,6 +191,56 @@ struct CSVImporter {
         return cal.date(from: components) ?? date
     }
 
+    // MARK: - Parse (no ModelContext required)
+
+    /// Parses a CSV string into model objects without inserting them into any context.
+    static func parseCSV(_ csv: String) throws -> (readings: [Reading], doses: [DoseEntry]) {
+        let lines = csv.components(separatedBy: .newlines).map { $0.trimmingCharacters(in: .whitespaces) }
+        guard !lines.isEmpty else { throw ImportError.emptyFile }
+
+        let header = parseCSVLine(lines[0].lowercased())
+        guard let dateCol = header.firstIndex(where: { $0.contains("date") }) else {
+            throw ImportError.missingColumns
+        }
+        let readingCol = header.firstIndex(where: { $0.contains("reading") })
+        let doseCol    = header.firstIndex(where: { $0.contains("dose") || $0.contains("dosis") })
+        let noteCol    = header.firstIndex(where: { $0.contains("note") })
+        if readingCol == nil && doseCol == nil { throw ImportError.missingColumns }
+
+        var readings: [Reading] = []
+        var doses: [DoseEntry] = []
+        let parsers = Self.dateParsers
+
+        for line in lines.dropFirst() {
+            guard !line.isEmpty else { continue }
+            let cols = Self.parseCSVLine(line)
+            guard dateCol < cols.count else { continue }
+
+            let rawDate = cols[dateCol].trimmingCharacters(in: .whitespaces)
+            guard let date = Self.parseDate(rawDate, using: parsers) else { continue }
+
+            let rawReading = readingCol.flatMap { $0 < cols.count ? cols[$0].trimmingCharacters(in: .whitespaces) : nil } ?? ""
+            let rawDose    = doseCol.flatMap    { $0 < cols.count ? cols[$0].trimmingCharacters(in: .whitespaces) : nil } ?? ""
+            let note       = noteCol.flatMap    { $0 < cols.count ? cols[$0].trimmingCharacters(in: .whitespaces) : nil } ?? ""
+
+            let readingValue = Double(rawReading.replacingOccurrences(of: ",", with: "."))
+            let doseValue    = Double(rawDose.replacingOccurrences(of: ",", with: "."))
+
+            if readingValue == nil && doseValue == nil { continue }
+
+            if let rv = readingValue {
+                readings.append(Reading(value: rv, recordedAt: date, note: note, dose: doseValue))
+                if let dose = doseValue {
+                    doses.append(DoseEntry(date: date, dose: dose, note: note))
+                }
+            } else if let dose = doseValue {
+                doses.append(DoseEntry(date: date, dose: dose, note: note))
+            }
+        }
+
+        return (readings, doses)
+    }
+
     // MARK: - Export
 
     static func exportCSV(readings: [Reading], doseEntries: [DoseEntry]) -> String {

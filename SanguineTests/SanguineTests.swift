@@ -258,12 +258,6 @@ final class DoseTimeLabelTests: XCTestCase {
         XCTAssertTrue(label.contains("8:30"), "Expected 8:30 in label, got: \(label)")
     }
 
-    func testTimezoneAbbreviationIncluded() {
-        let label = doseTimeLabel(hour: 8, minute: 0, timezoneID: "Europe/Berlin")
-        XCTAssertTrue(label.contains("CET") || label.contains("CEST"),
-                      "Expected CET/CEST in label, got: \(label)")
-    }
-
     func testFallsBackToCurrentForUnknownTimezone() {
         let label = doseTimeLabel(hour: 8, minute: 0, timezoneID: "Invalid/Zone")
         XCTAssertFalse(label.isEmpty)

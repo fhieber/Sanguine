@@ -197,28 +197,41 @@ struct CSVImporter {
         let df = ISO8601DateFormatter()
         df.formatOptions = [.withInternetDateTime]
         let cal = Calendar.current
-        var lines = ["date,reading,dose,note"]
-
-        // Readings — include embedded dose if present
-        for r in readings.sorted(by: { $0.recordedAt < $1.recordedAt }) {
-            let note = r.note.replacingOccurrences(of: ",", with: ";")
-            let dose = r.dose.map { $0.doseFormatted } ?? ""
-            lines.append("\(df.string(from: r.recordedAt)),\(r.value),\(dose),\(note)")
-        }
 
         // Build a set of days where a reading already carries a dose value
         let readingDaysWithDose = Set(
             readings.compactMap { $0.dose != nil ? cal.startOfDay(for: $0.recordedAt) : nil }
         )
 
-        // Dose-only entries: export unless the same day's reading already has the dose embedded
-        for e in doseEntries.sorted(by: { $0.date < $1.date }) {
-            guard !readingDaysWithDose.contains(cal.startOfDay(for: e.date)) else { continue }
-            let note = e.note.replacingOccurrences(of: ",", with: ";")
-            lines.append("\(df.string(from: e.date)),,\(e.dose.doseFormatted),\(note)")
+        // Deduplicate dose entries by calendar day — keep the latest per day
+        var latestDosePerDay: [Date: DoseEntry] = [:]
+        for e in doseEntries {
+            let day = cal.startOfDay(for: e.date)
+            if let existing = latestDosePerDay[day] {
+                if e.date > existing.date { latestDosePerDay[day] = e }
+            } else {
+                latestDosePerDay[day] = e
+            }
         }
 
-        return lines.joined(separator: "\n")
+        // Collect all rows as (sortDate, csvLine) — merge readings and dose-only entries
+        var rows: [(date: Date, line: String)] = []
+
+        for r in readings {
+            let note = r.note.replacingOccurrences(of: ",", with: ";")
+            let dose = r.dose.map { $0.doseFormatted } ?? ""
+            rows.append((r.recordedAt, "\(df.string(from: r.recordedAt)),\(r.value),\(dose),\(note)"))
+        }
+
+        for e in latestDosePerDay.values {
+            guard !readingDaysWithDose.contains(cal.startOfDay(for: e.date)) else { continue }
+            let note = e.note.replacingOccurrences(of: ",", with: ";")
+            rows.append((e.date, "\(df.string(from: e.date)),,\(e.dose.doseFormatted),\(note)"))
+        }
+
+        rows.sort { $0.date < $1.date }
+
+        return (["date,reading,dose,note"] + rows.map(\.line)).joined(separator: "\n")
     }
 
     enum ImportError: LocalizedError {

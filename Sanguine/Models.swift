@@ -66,12 +66,14 @@ func doseTimeLabel(hour: Int, minute: Int, timezoneID: String) -> String {
     cal.timeZone = tz
     var c = DateComponents(); c.hour = hour; c.minute = minute
     guard let date = cal.date(from: c) else { return "" }
+    let nameStyle: TimeZone.NameStyle = tz.isDaylightSavingTime(for: .now) ? .shortDaylightSaving : .shortStandard
+    let abbr = tz.localizedName(for: nameStyle, locale: Locale(identifier: "en_US")) ?? tz.identifier
     let fmt = DateFormatter()
     fmt.timeZone = tz
     fmt.locale = Locale(identifier: "en_US")
     fmt.amSymbol = "am"; fmt.pmSymbol = "pm"
-    fmt.dateFormat = minute == 0 ? "ha zzz" : "h:mma zzz"
-    return fmt.string(from: date)
+    fmt.dateFormat = minute == 0 ? "ha" : "h:mma"
+    return "\(fmt.string(from: date)) \(abbr)"
 }
 
 // MARK: - Dose Planning

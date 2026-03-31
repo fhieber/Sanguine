@@ -131,6 +131,57 @@ func upsertPlannedDays(_ days: [PlannedDay], doses: [DoseEntry], into context: M
     }
 }
 
+// MARK: - Demo Data
+
+/// Generates synthetic demo readings and dose entries, inserts them into `context`,
+/// and returns the inserted readings (so callers can derive statistics like target range).
+@discardableResult
+func generateDemoData(into context: ModelContext) -> [Reading] {
+    func gaussian(mean: Double, sigma: Double) -> Double {
+        let u1 = Double.random(in: .leastNormalMagnitude...1)
+        let u2 = Double.random(in: 0...1)
+        return mean + sigma * sqrt(-2 * log(u1)) * cos(2 * .pi * u2)
+    }
+
+    let cal = Calendar.current
+    let now = Date()
+    let mean = 8.0
+    let sigma = 0.7
+    let meanDose = 3.5
+    var generatedReadings: [Reading] = []
+    var prevDose = meanDose
+
+    for week in stride(from: -38, through: 0, by: 1) {
+        guard let baseDate = cal.date(byAdding: .weekOfYear, value: week, to: now) else { continue }
+        let jitter = TimeInterval.random(in: -86400...86400)
+        let date = baseDate.addingTimeInterval(jitter)
+        guard date <= now else { continue }
+
+        let doseEffect = -0.7 * (prevDose - meanDose)
+        let value = max(4, min(12, gaussian(mean: mean + doseEffect, sigma: sigma)))
+        let roundedValue = (value * 10).rounded() / 10
+
+        let readingDeviation = roundedValue - mean
+        let nextDose = max(1, min(6, gaussian(mean: meanDose + 0.4 * readingDeviation, sigma: 0.3)))
+        let roundedDose = (nextDose * 4).rounded() / 4
+
+        let r = Reading(value: roundedValue, recordedAt: date)
+        r.dose = roundedDose
+        generatedReadings.append(r)
+        context.insert(r)
+        prevDose = roundedDose
+
+        if let midDate = cal.date(byAdding: .day, value: 3, to: date), midDate <= now {
+            let midDose = max(1, min(6, gaussian(mean: roundedDose, sigma: 0.2)))
+            let entry = DoseEntry(date: midDate, dose: (midDose * 4).rounded() / 4)
+            entry.isPlanned = false
+            context.insert(entry)
+        }
+    }
+
+    return generatedReadings
+}
+
 // MARK: - Statistics Helpers
 
 struct ReadingStats {

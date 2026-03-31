@@ -404,6 +404,28 @@ final class CSVRoundtripTests: XCTestCase {
         XCTAssertEqual(doseOnly.note, d1.note)
     }
 
+    func testRandomRoundtrip() throws {
+        // Generate demo data into context1 and export to CSV
+        let context1 = try makeContext()
+        let generatedReadings = generateDemoData(into: context1)
+        let generatedDoses    = try context1.fetch(FetchDescriptor<DoseEntry>())
+        let csv1 = CSVImporter.exportCSV(readings: generatedReadings, doseEntries: generatedDoses)
+
+        // Import that CSV into a fresh context and re-export
+        let context2 = try makeContext()
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString + ".csv")
+        try csv1.write(to: url, atomically: true, encoding: .utf8)
+        let result = try CSVImporter.importData(from: url, into: context2)
+        XCTAssertTrue(result.errors.isEmpty, "Import errors: \(result.errors)")
+
+        let readings2 = try context2.fetch(FetchDescriptor<Reading>())
+        let doses2    = try context2.fetch(FetchDescriptor<DoseEntry>())
+        let csv2 = CSVImporter.exportCSV(readings: readings2, doseEntries: doses2)
+
+        XCTAssertEqual(csv1, csv2)
+    }
+
     func testDeduplication() throws {
         let context = try makeContext()
         let r = Reading(value: 2.8, recordedAt: date("2026-02-05T10:00:00+01:00"), dose: 1.0)

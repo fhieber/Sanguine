@@ -273,54 +273,7 @@ struct SettingsView: View {
     }
 
     private func loadDemoData() {
-        // Box-Muller Gaussian sampler
-        func gaussian(mean: Double, sigma: Double) -> Double {
-            let u1 = Double.random(in: .leastNormalMagnitude...1)
-            let u2 = Double.random(in: 0...1)
-            return mean + sigma * sqrt(-2 * log(u1)) * cos(2 * .pi * u2)
-        }
-
-        let cal = Calendar.current
-        let now = Date()
-        let mean = 8.0
-        let sigma = 0.7
-        let meanDose = 3.5
-
-        // Generate readings with dose-reading feedback loop:
-        // higher reading → higher next dose → lower subsequent reading
-        var generatedReadings: [Reading] = []
-        var prevDose = meanDose
-
-        for week in stride(from: -38, through: 0, by: 1) {
-            guard let baseDate = cal.date(byAdding: .weekOfYear, value: week, to: now) else { continue }
-            let jitter = TimeInterval.random(in: -86400...86400)
-            let date = baseDate.addingTimeInterval(jitter)
-            guard date <= now else { continue }
-
-            // Reading influenced by previous dose: higher dose pulls reading down
-            let doseEffect = -0.7 * (prevDose - meanDose)
-            let value = max(4, min(12, gaussian(mean: mean + doseEffect, sigma: sigma)))
-            let roundedValue = (value * 10).rounded() / 10
-
-            // Dose at reading day: respond to reading deviation
-            let readingDeviation = roundedValue - mean
-            let nextDose = max(1, min(6, gaussian(mean: meanDose + 0.4 * readingDeviation, sigma: 0.3)))
-            let roundedDose = (nextDose * 4).rounded() / 4
-
-            let r = Reading(value: roundedValue, recordedAt: date)
-            r.dose = roundedDose
-            generatedReadings.append(r)
-            modelContext.insert(r)
-            prevDose = roundedDose
-
-            // Mid-week dose entry (3 days later)
-            if let midDate = cal.date(byAdding: .day, value: 3, to: date), midDate <= now {
-                let midDose = max(1, min(6, gaussian(mean: roundedDose, sigma: 0.2)))
-                let entry = DoseEntry(date: midDate, dose: (midDose * 4).rounded() / 4)
-                entry.isPlanned = false
-                modelContext.insert(entry)
-            }
-        }
+        let generatedReadings = generateDemoData(into: modelContext)
 
         // Set target range to cover ~70% of data (mean ± 1σ → ~30% out of range)
         let values = generatedReadings.map(\.value)

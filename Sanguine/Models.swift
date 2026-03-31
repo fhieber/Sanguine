@@ -62,16 +62,16 @@ extension Notification.Name {
 /// Formats a stored hour/minute/timezone into a human-readable label, e.g. "6pm CET".
 func doseTimeLabel(hour: Int, minute: Int, timezoneID: String) -> String {
     let tz = TimeZone(identifier: timezoneID) ?? .current
-    let abbr = tz.abbreviation(for: .now) ?? tz.identifier
     var cal = Calendar(identifier: .gregorian)
     cal.timeZone = tz
     var c = DateComponents(); c.hour = hour; c.minute = minute
     guard let date = cal.date(from: c) else { return "" }
     let fmt = DateFormatter()
     fmt.timeZone = tz
-    fmt.dateFormat = minute == 0 ? "ha" : "h:mma"
+    fmt.locale = Locale(identifier: "en_US")
     fmt.amSymbol = "am"; fmt.pmSymbol = "pm"
-    return "\(fmt.string(from: date)) \(abbr)"
+    fmt.dateFormat = minute == 0 ? "ha zzz" : "h:mma zzz"
+    return fmt.string(from: date)
 }
 
 // MARK: - Dose Planning
@@ -101,9 +101,8 @@ func buildPlannedDays(startingAt startDay: Date, in doses: [DoseEntry]) -> [Plan
         .filter { $0 >= startDay }
         .sorted()
     var uniqueDates = Array(NSOrderedSet(array: futureDates)) as! [Date]
-    // Always include startDay as the first entry so today is always editable
-    if uniqueDates.first != startDay {
-        uniqueDates.insert(startDay, at: 0)
+    if uniqueDates.isEmpty {
+        uniqueDates = [startDay]
     }
     return uniqueDates.map { PlannedDay(date: $0, doseText: plannedDoseText(for: $0, in: doses)) }
 }
@@ -188,7 +187,8 @@ struct DoseStats {
     private var completeWeeklyGroups: [Date: [DoseEntry]] {
         guard let minDate = entries.map(\.date).min(),
               let maxDate = entries.map(\.date).max() else { return [:] }
-        let cal = Calendar.current
+        var cal = Calendar.current
+        cal.firstWeekday = 2  // Monday
         let byWeek = Dictionary(grouping: entries) { entry -> Date in
             cal.dateInterval(of: .weekOfYear, for: entry.date)?.start ?? entry.date
         }

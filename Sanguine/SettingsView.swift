@@ -74,6 +74,7 @@ struct SettingsView: View {
                             Text(tz.displayLabel).tag(tz.identifier)
                         }
                     }
+                    .onChange(of: doseTimezoneID) { scheduleDoseReminderIfNeeded() }
                 } header: {
                     Text("Dose Time")
                 } footer: {
@@ -237,11 +238,14 @@ struct SettingsView: View {
             NotificationManager.shared.cancelPlannedDoseNotification()
             return
         }
-        if let dose = doseEntries.first(where: {
-            $0.isPlanned != false && Calendar.current.isDateInToday($0.date)
-        }) {
-            NotificationManager.shared.schedulePlannedDoseNotification(
-                dose: dose.dose, hour: doseHour, minute: doseMinute, timezoneID: doseTimezoneID
+        let today = Calendar.current.startOfDay(for: .now)
+        let planned = doseEntries.filter { $0.isPlanned == true && $0.date >= today }
+        if planned.isEmpty {
+            NotificationManager.shared.cancelPlannedDoseNotification()
+        } else {
+            NotificationManager.shared.schedulePlannedDoseNotifications(
+                plannedDoses: planned.map { ($0.date, $0.dose) },
+                hour: doseHour, minute: doseMinute, timezoneID: doseTimezoneID
             )
         }
     }

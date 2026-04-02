@@ -25,7 +25,7 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         willPresent notification: UNNotification,
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
-        completionHandler([.banner, .sound])
+        completionHandler([.banner, .sound, .list])
     }
 
     // Handle notification tap and background actions
@@ -59,6 +59,22 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
             try? context.save()
         }
         NotificationManager.shared.cancelPlannedDoseNotification()
+
+        // Immediately re-schedule for remaining future planned doses so tomorrow's
+        // notifications are in place without requiring the app to be opened.
+        let tomorrow = Calendar.current.startOfDay(for: Calendar.current.date(byAdding: .day, value: 1, to: .now)!)
+        let futurePlanned = all.filter { $0.isPlanned == true && $0.date >= tomorrow }
+        if !futurePlanned.isEmpty {
+            let defaults = UserDefaults.appGroup
+            let hour   = (defaults.object(forKey: "doseTimeHour")   as? Int) ?? 18
+            let minute = (defaults.object(forKey: "doseTimeMinute") as? Int) ?? 0
+            let tzID   = defaults.string(forKey: "doseTimezone") ?? "Europe/Berlin"
+            NotificationManager.shared.schedulePlannedDoseNotifications(
+                plannedDoses: futurePlanned.map { ($0.date, $0.dose) },
+                hour: hour, minute: minute, timezoneID: tzID
+            )
+        }
+
         WidgetCenter.shared.reloadAllTimelines()
     }
 }

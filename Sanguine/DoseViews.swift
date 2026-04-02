@@ -205,8 +205,8 @@ struct DoseTab: View {
             .onReceive(NotificationCenter.default.publisher(for: .navigateToDoseDetail)) { _ in
                 handleDeepLinkIfNeeded()
             }
-            .task { scheduleTodayNotification() }
-            .onChange(of: todaysDose) { scheduleTodayNotification() }
+            .task { scheduleDoseNotifications() }
+            .onChange(of: allEntries) { scheduleDoseNotifications() }
         }
     }
 
@@ -216,13 +216,20 @@ struct DoseTab: View {
         deepLinkEntry = todaysDose.first
     }
 
-    private func scheduleTodayNotification() {
-        if let dose = todaysDose.first, doseReminderEnabled {
-            NotificationManager.shared.schedulePlannedDoseNotification(
-                dose: dose.dose, hour: doseHour, minute: doseMinute, timezoneID: doseTimezoneID
-            )
-        } else {
+    private func scheduleDoseNotifications() {
+        guard doseReminderEnabled else {
             NotificationManager.shared.cancelPlannedDoseNotification()
+            return
+        }
+        let today = Calendar.current.startOfDay(for: .now)
+        let planned = allEntries.filter { $0.isPlanned == true && $0.date >= today }
+        if planned.isEmpty {
+            NotificationManager.shared.cancelPlannedDoseNotification()
+        } else {
+            NotificationManager.shared.schedulePlannedDoseNotifications(
+                plannedDoses: planned.map { ($0.date, $0.dose) },
+                hour: doseHour, minute: doseMinute, timezoneID: doseTimezoneID
+            )
         }
     }
 

@@ -13,6 +13,7 @@ struct SanguineEntry: TimelineEntry {
     let todayDoseTime: String?   // formatted time string for planned dose
     let todayDoseTaken: Bool     // true if dose already applied today
     let doseTimeLocal: String    // reminder time formatted in user's local timezone
+    let todayDoseActualTime: String?  // actual time dose was taken (nil if not yet taken)
 }
 
 // MARK: - Timeline Provider
@@ -27,7 +28,8 @@ struct SanguineProvider: TimelineProvider {
             todayDose: 1.25,
             todayDoseTime: "6pm CET",
             todayDoseTaken: false,
-            doseTimeLocal: "6:00 PM"
+            doseTimeLocal: "6:00 PM",
+            todayDoseActualTime: nil
         )
     }
 
@@ -75,6 +77,7 @@ struct SanguineProvider: TimelineProvider {
         var todayDose: Double?
         var todayDoseTime: String?
         var todayDoseTaken = false
+        var todayDoseActualTime: String? = nil
 
         if let container = try? makeSharedModelContainer() {
             let ctx = ModelContext(container)
@@ -97,6 +100,10 @@ struct SanguineProvider: TimelineProvider {
                     todayDoseTaken = false
                 } else {
                     todayDoseTaken = true
+                    let fmt = DateFormatter()
+                    fmt.timeStyle = .short
+                    fmt.dateStyle = .none
+                    todayDoseActualTime = fmt.string(from: entry.date)
                 }
             }
         }
@@ -109,7 +116,8 @@ struct SanguineProvider: TimelineProvider {
             todayDose: todayDose,
             todayDoseTime: todayDoseTime,
             todayDoseTaken: todayDoseTaken,
-            doseTimeLocal: doseTimeLocal
+            doseTimeLocal: doseTimeLocal,
+            todayDoseActualTime: todayDoseActualTime
         )
     }
 }
@@ -166,7 +174,9 @@ struct SanguineWidgetEntryView: View {
                         .foregroundStyle(entry.todayDoseTaken ? .green : (entry.todayDose != nil ? .primary : .red))
                         .font(isSmall ? .body : .title2)
                     VStack(alignment: .leading, spacing: 1) {
-                        Text("Today \(entry.doseTimeLocal)")
+                        Text(entry.todayDoseTaken && entry.todayDoseActualTime != nil
+                             ? "Today \(entry.todayDoseActualTime!)"
+                             : "Today \(entry.doseTimeLocal)")
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
@@ -224,7 +234,7 @@ struct SanguineWidget: Widget {
 #Preview(as: .systemMedium) {
     SanguineWidget()
 } timeline: {
-    SanguineEntry(date: .now, latestReading: 2.5, readingDate: .now, readingInRange: true, todayDose: 1.25, todayDoseTime: "6pm CET", todayDoseTaken: false, doseTimeLocal: "6:00 PM")
-    SanguineEntry(date: .now, latestReading: 3.8, readingDate: .now, readingInRange: false, todayDose: 1.0, todayDoseTime: nil, todayDoseTaken: true, doseTimeLocal: "6:00 PM")
-    SanguineEntry(date: .now, latestReading: 2.1, readingDate: .now, readingInRange: true, todayDose: nil, todayDoseTime: nil, todayDoseTaken: false, doseTimeLocal: "6:00 PM")
+    SanguineEntry(date: .now, latestReading: 2.5, readingDate: .now, readingInRange: true, todayDose: 1.25, todayDoseTime: "6pm CET", todayDoseTaken: false, doseTimeLocal: "6:00 PM", todayDoseActualTime: nil)
+    SanguineEntry(date: .now, latestReading: 3.8, readingDate: .now, readingInRange: false, todayDose: 1.0, todayDoseTime: nil, todayDoseTaken: true, doseTimeLocal: "6:00 PM", todayDoseActualTime: "4:32 PM")
+    SanguineEntry(date: .now, latestReading: 2.1, readingDate: .now, readingInRange: true, todayDose: nil, todayDoseTime: nil, todayDoseTaken: false, doseTimeLocal: "6:00 PM", todayDoseActualTime: nil)
 }

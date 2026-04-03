@@ -213,7 +213,8 @@ struct DoseTab: View {
     private func handleDeepLinkIfNeeded() {
         guard UserDefaults.standard.bool(forKey: "navigateToDoseDetail") else { return }
         UserDefaults.standard.removeObject(forKey: "navigateToDoseDetail")
-        deepLinkEntry = todaysDose.first
+        let todaysTakenDose = allEntries.first(where: { $0.isPlanned == false && Calendar.current.isDateInToday($0.date) })
+        deepLinkEntry = todaysTakenDose ?? todaysDose.first
     }
 
     private func scheduleDoseNotifications() {

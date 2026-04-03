@@ -12,6 +12,7 @@ struct SanguineEntry: TimelineEntry {
     let todayDose: Double?
     let todayDoseTime: String?   // formatted time string for planned dose
     let todayDoseTaken: Bool     // true if dose already applied today
+    let doseTimeLocal: String    // reminder time formatted in user's local timezone
 }
 
 // MARK: - Timeline Provider
@@ -25,7 +26,8 @@ struct SanguineProvider: TimelineProvider {
             readingInRange: true,
             todayDose: 1.25,
             todayDoseTime: "6pm CET",
-            todayDoseTaken: false
+            todayDoseTaken: false,
+            doseTimeLocal: "6:00 PM"
         )
     }
 
@@ -47,6 +49,25 @@ struct SanguineProvider: TimelineProvider {
         let doseHour   = (defaults.object(forKey: "doseTimeHour")      as? Int)     ?? 18
         let doseMinute = (defaults.object(forKey: "doseTimeMinute")    as? Int)     ?? 0
         let tzID       = defaults.string(forKey: "doseTimezone") ?? "Europe/Berlin"
+
+        // Compute dose reminder time converted to the user's local timezone
+        let sourceTZ = TimeZone(identifier: tzID) ?? TimeZone(identifier: "Europe/Berlin")!
+        var tzCal = Calendar(identifier: .gregorian)
+        tzCal.timeZone = sourceTZ
+        var doseComps = tzCal.dateComponents([.year, .month, .day], from: Date())
+        doseComps.hour = doseHour
+        doseComps.minute = doseMinute
+        doseComps.second = 0
+        let doseTimeLocal: String
+        if let doseDate = tzCal.date(from: doseComps) {
+            let fmt = DateFormatter()
+            fmt.timeStyle = .short
+            fmt.dateStyle = .none
+            // fmt.timeZone defaults to system timezone — converts to user's local TZ
+            doseTimeLocal = fmt.string(from: doseDate)
+        } else {
+            doseTimeLocal = ""
+        }
 
         var latestReading: Double?
         var readingDate: Date?
@@ -87,7 +108,8 @@ struct SanguineProvider: TimelineProvider {
             readingInRange: readingInRange,
             todayDose: todayDose,
             todayDoseTime: todayDoseTime,
-            todayDoseTaken: todayDoseTaken
+            todayDoseTaken: todayDoseTaken,
+            doseTimeLocal: doseTimeLocal
         )
     }
 }
@@ -100,16 +122,22 @@ struct SanguineWidgetEntryView: View {
 
     private var isSmall: Bool { family == .systemSmall }
 
+    private var daysSinceReading: Int? {
+        guard let d = entry.readingDate else { return nil }
+        return Calendar.current.dateComponents([.day], from: d, to: .now).day
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: isSmall ? 4 : 8) {
             // Row 1: Latest reading — taps to add new reading
             Link(destination: URL(string: "sanguine://add-reading")!) {
                 HStack(spacing: 8) {
-                    Image(systemName: entry.readingInRange == false ? "exclamationmark.circle.fill" : "checkmark.circle.fill")
-                        .foregroundStyle(entry.readingInRange == false ? .red : .green)
+                    let staleReading = (daysSinceReading ?? 0) > 7
+                    Image(systemName: staleReading || entry.readingInRange == false ? "exclamationmark.circle.fill" : "checkmark.circle.fill")
+                        .foregroundStyle(staleReading || entry.readingInRange == false ? .red : .green)
                         .font(isSmall ? .body : .title2)
                     VStack(alignment: .leading, spacing: 1) {
-                        Text("Last Reading")
+                        Text(daysSinceReading.map { "Reading (\($0)d ago)" } ?? "Reading")
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                         HStack(alignment: .firstTextBaseline, spacing: 4) {
@@ -138,7 +166,7 @@ struct SanguineWidgetEntryView: View {
                         .foregroundStyle(entry.todayDoseTaken ? .green : (entry.todayDose != nil ? .primary : .red))
                         .font(isSmall ? .body : .title2)
                     VStack(alignment: .leading, spacing: 1) {
-                        Text("Today's Dose")
+                        Text("Today \(entry.doseTimeLocal)")
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
@@ -196,7 +224,7 @@ struct SanguineWidget: Widget {
 #Preview(as: .systemMedium) {
     SanguineWidget()
 } timeline: {
-    SanguineEntry(date: .now, latestReading: 2.5, readingDate: .now, readingInRange: true, todayDose: 1.25, todayDoseTime: "6pm CET", todayDoseTaken: false)
-    SanguineEntry(date: .now, latestReading: 3.8, readingDate: .now, readingInRange: false, todayDose: 1.0, todayDoseTime: nil, todayDoseTaken: true)
-    SanguineEntry(date: .now, latestReading: 2.1, readingDate: .now, readingInRange: true, todayDose: nil, todayDoseTime: nil, todayDoseTaken: false)
+    SanguineEntry(date: .now, latestReading: 2.5, readingDate: .now, readingInRange: true, todayDose: 1.25, todayDoseTime: "6pm CET", todayDoseTaken: false, doseTimeLocal: "6:00 PM")
+    SanguineEntry(date: .now, latestReading: 3.8, readingDate: .now, readingInRange: false, todayDose: 1.0, todayDoseTime: nil, todayDoseTaken: true, doseTimeLocal: "6:00 PM")
+    SanguineEntry(date: .now, latestReading: 2.1, readingDate: .now, readingInRange: true, todayDose: nil, todayDoseTime: nil, todayDoseTaken: false, doseTimeLocal: "6:00 PM")
 }

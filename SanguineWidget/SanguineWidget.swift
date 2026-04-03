@@ -42,10 +42,10 @@ struct SanguineProvider: TimelineProvider {
 
     private func buildEntry() -> SanguineEntry {
         let defaults = UserDefaults.appGroup
-        let lowTarget  = defaults.object(forKey: "readingLowTarget")  == nil ? 2.0 : defaults.double(forKey: "readingLowTarget")
-        let highTarget = defaults.object(forKey: "readingHighTarget") == nil ? 3.0 : defaults.double(forKey: "readingHighTarget")
-        let doseHour   = defaults.object(forKey: "doseTimeHour")   == nil ? 18  : defaults.integer(forKey: "doseTimeHour")
-        let doseMinute = defaults.object(forKey: "doseTimeMinute") == nil ? 0   : defaults.integer(forKey: "doseTimeMinute")
+        let lowTarget  = (defaults.object(forKey: "readingLowTarget")  as? Double)  ?? 2.0
+        let highTarget = (defaults.object(forKey: "readingHighTarget") as? Double)  ?? 3.0
+        let doseHour   = (defaults.object(forKey: "doseTimeHour")      as? Int)     ?? 18
+        let doseMinute = (defaults.object(forKey: "doseTimeMinute")    as? Int)     ?? 0
         let tzID       = defaults.string(forKey: "doseTimezone") ?? "Europe/Berlin"
 
         var latestReading: Double?
@@ -72,7 +72,7 @@ struct SanguineProvider: TimelineProvider {
             if let entry = allDoses.first(where: { Calendar.current.isDateInToday($0.date) }) {
                 todayDose = entry.dose
                 if entry.isPlanned != false {
-                    todayDoseTime = widgetDoseTimeLabel(hour: doseHour, minute: doseMinute, timezoneID: tzID)
+                    todayDoseTime = doseTimeLabel(hour: doseHour, minute: doseMinute, timezoneID: tzID)
                     todayDoseTaken = false
                 } else {
                     todayDoseTaken = true
@@ -144,12 +144,12 @@ struct SanguineWidgetEntryView: View {
                             .lineLimit(1)
                             .minimumScaleFactor(0.7)
                         if entry.todayDoseTaken {
-                            Text(doseString(entry.todayDose))
+                            Text(entry.todayDose?.doseFormatted ?? "—")
                                 .font(isSmall ? .headline : .title2)
                                 .bold()
                         } else if let dose = entry.todayDose {
                             HStack(alignment: .firstTextBaseline, spacing: 4) {
-                                Text(doseString(dose))
+                                Text(dose.doseFormatted)
                                     .font(isSmall ? .headline : .title2)
                                     .bold()
                                 if !isSmall, let t = entry.todayDoseTime {
@@ -173,10 +173,6 @@ struct SanguineWidgetEntryView: View {
         .padding(isSmall ? 4 : 12)
     }
 
-    private func doseString(_ dose: Double?) -> String {
-        guard let d = dose else { return "—" }
-        return d.truncatingRemainder(dividingBy: 1) == 0 ? "\(Int(d))" : "\(d)"
-    }
 }
 
 // MARK: - Widget Definition
@@ -203,20 +199,4 @@ struct SanguineWidget: Widget {
     SanguineEntry(date: .now, latestReading: 2.5, readingDate: .now, readingInRange: true, todayDose: 1.25, todayDoseTime: "6pm CET", todayDoseTaken: false)
     SanguineEntry(date: .now, latestReading: 3.8, readingDate: .now, readingInRange: false, todayDose: 1.0, todayDoseTime: nil, todayDoseTaken: true)
     SanguineEntry(date: .now, latestReading: 2.1, readingDate: .now, readingInRange: true, todayDose: nil, todayDoseTime: nil, todayDoseTaken: false)
-}
-
-// MARK: - Helpers
-
-private func widgetDoseTimeLabel(hour: Int, minute: Int, timezoneID: String) -> String {
-    let tz = TimeZone(identifier: timezoneID) ?? .current
-    let abbr = tz.abbreviation(for: .now) ?? tz.identifier
-    var cal = Calendar(identifier: .gregorian)
-    cal.timeZone = tz
-    var c = DateComponents(); c.hour = hour; c.minute = minute
-    guard let date = cal.date(from: c) else { return "" }
-    let fmt = DateFormatter()
-    fmt.timeZone = tz
-    fmt.dateFormat = minute == 0 ? "ha" : "h:mma"
-    fmt.amSymbol = "am"; fmt.pmSymbol = "pm"
-    return "\(fmt.string(from: date)) \(abbr)"
 }

@@ -103,7 +103,7 @@ struct SanguineWidgetEntryView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: isSmall ? 4 : 8) {
             // Row 1: Latest reading — taps to add new reading
-            Link(destination: URL(string: "medtracker://add-reading")!) {
+            Link(destination: URL(string: "sanguine://add-reading")!) {
                 HStack(spacing: 8) {
                     Image(systemName: entry.readingInRange == false ? "exclamationmark.circle.fill" : "checkmark.circle.fill")
                         .foregroundStyle(entry.readingInRange == false ? .red : .green)
@@ -132,7 +132,7 @@ struct SanguineWidgetEntryView: View {
             if isSmall { Divider() }
 
             // Row 2: Today's dose — taps to open dose detail
-            Link(destination: URL(string: "medtracker://dose-detail")!) {
+            Link(destination: URL(string: "sanguine://dose-detail")!) {
                 HStack(spacing: 8) {
                     Image(systemName: entry.todayDoseTaken ? "checkmark.circle.fill" : (entry.todayDose != nil ? "calendar.badge.checkmark" : "exclamationmark.circle.fill"))
                         .foregroundStyle(entry.todayDoseTaken ? .green : (entry.todayDose != nil ? .primary : .red))

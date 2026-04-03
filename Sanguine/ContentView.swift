@@ -25,9 +25,11 @@ struct ContentView: View {
             switch url.host {
             case "add-reading":
                 selectedTab = 0
+                UserDefaults.standard.set(true, forKey: "navigateToAddReading")
                 NotificationCenter.default.post(name: .navigateToAddReading, object: nil)
             case "dose-detail":
                 selectedTab = 1
+                UserDefaults.standard.set(true, forKey: "navigateToDoseDetail")
                 NotificationCenter.default.post(name: .navigateToDoseDetail, object: nil)
             default:
                 break

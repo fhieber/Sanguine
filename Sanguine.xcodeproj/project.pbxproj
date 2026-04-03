@@ -81,6 +81,7 @@
 		9B8151002F73EDAE006DF949 /* SanguineUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SanguineUITests.swift; sourceTree = "<group>"; };
 		9B8151022F73EDAE006DF949 /* SanguineUITestsLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SanguineUITestsLaunchTests.swift; sourceTree = "<group>"; };
 		9B81510F2F73EE47006DF949 /* Sanguine-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Sanguine-Bridging-Header.h"; sourceTree = "<group>"; };
+		9B0000002F99000000000001 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		9B8151102F73EE47006DF949 /* SettingsView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		9B8151112F73EE47006DF949 /* CSVImporter.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CSVImporter.swift; sourceTree = "<group>"; };
 		9B8151122F73EE47006DF949 /* ReadingsViews.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ReadingsViews.swift; sourceTree = "<group>"; };
@@ -166,6 +167,7 @@
 				9B8151212F73EE49006DF949 /* AppDelegate.swift */,
 				9B8151232F73EE49006DF949 /* SharedContainer.swift */,
 				9B8151242F73EE49006DF949 /* Sanguine.entitlements */,
+				9B0000002F99000000000001 /* Info.plist */,
 				9B8151152F73EE47006DF949 /* ContentView.swift */,
 				9B8151132F73EE47006DF949 /* Models.swift */,
 				9B8151122F73EE47006DF949 /* ReadingsViews.swift */,
@@ -582,6 +584,7 @@
 				DEVELOPMENT_TEAM = 4DTYZA3KVS;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Sanguine/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Sanguine;
@@ -619,6 +622,7 @@
 				DEVELOPMENT_TEAM = 4DTYZA3KVS;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Sanguine/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Sanguine;

@@ -75,11 +75,16 @@ jobs:
         run: |
           mkdir -p ~/private_keys
           echo -n "$API_KEY_BASE64" | base64 --decode -o ~/private_keys/AuthKey_${API_KEY_ID}.p8
-          xcrun altool --upload-app \
+          OUTPUT=$(xcrun altool --upload-app \
             --type ios \
             --file $RUNNER_TEMP/export/Sanguine.ipa \
             --apiKey $API_KEY_ID \
-            --apiIssuer $API_ISSUER_ID
+            --apiIssuer $API_ISSUER_ID 2>&1)
+          echo "$OUTPUT"
+          if echo "$OUTPUT" | grep -qi "error"; then
+            echo "Upload failed: errors detected in altool output"
+            exit 1
+          fi
 
       - name: Clean up keychain
         if: always()

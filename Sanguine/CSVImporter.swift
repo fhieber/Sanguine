@@ -203,9 +203,9 @@ struct CSVImporter {
             readings.compactMap { $0.dose != nil ? cal.startOfDay(for: $0.recordedAt) : nil }
         )
 
-        // Deduplicate dose entries by calendar day — keep the latest per day
+        // Exclude planned doses and deduplicate actual entries by calendar day — keep the latest per day
         var latestDosePerDay: [Date: DoseEntry] = [:]
-        for e in doseEntries {
+        for e in doseEntries where e.isPlanned != true {
             let day = cal.startOfDay(for: e.date)
             if let existing = latestDosePerDay[day] {
                 if e.date > existing.date { latestDosePerDay[day] = e }

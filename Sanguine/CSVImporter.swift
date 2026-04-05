@@ -198,14 +198,12 @@ struct CSVImporter {
         df.formatOptions = [.withInternetDateTime]
         let cal = Calendar.current
 
-        // Build a set of days where a reading already carries a dose value
-        let readingDaysWithDose = Set(
-            readings.compactMap { $0.dose != nil ? cal.startOfDay(for: $0.recordedAt) : nil }
-        )
+        // Build a set of days that have any reading (used to suppress standalone dose rows)
+        let readingDays = Set(readings.map { cal.startOfDay(for: $0.recordedAt) })
 
-        // Deduplicate dose entries by calendar day — keep the latest per day
+        // Exclude planned doses and deduplicate actual entries by calendar day — keep the latest per day
         var latestDosePerDay: [Date: DoseEntry] = [:]
-        for e in doseEntries {
+        for e in doseEntries where e.isPlanned != true {
             let day = cal.startOfDay(for: e.date)
             if let existing = latestDosePerDay[day] {
                 if e.date > existing.date { latestDosePerDay[day] = e }
@@ -224,7 +222,7 @@ struct CSVImporter {
         }
 
         for e in latestDosePerDay.values {
-            guard !readingDaysWithDose.contains(cal.startOfDay(for: e.date)) else { continue }
+            guard !readingDays.contains(cal.startOfDay(for: e.date)) else { continue }
             let note = e.note.replacingOccurrences(of: ",", with: ";")
             rows.append((e.date, "\(df.string(from: e.date)),,\(e.dose.doseFormatted),\(note)"))
         }

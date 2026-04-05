@@ -81,8 +81,8 @@ jobs:
             --apiKey $API_KEY_ID \
             --apiIssuer $API_ISSUER_ID 2>&1)
           echo "$OUTPUT"
-          if echo "$OUTPUT" | grep -qi "error"; then
-            echo "Upload failed: errors detected in altool output"
+          if ! echo "$OUTPUT" | grep -q "UPLOAD SUCCEEDED"; then
+            echo "Upload failed: 'UPLOAD SUCCEEDED' not found in altool output"
             exit 1
           fi
 

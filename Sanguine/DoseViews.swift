@@ -545,6 +545,7 @@ struct AddDosePlanView: View {
 
     private func save() {
         upsertPlannedDays(days, doses: allDoses, into: modelContext)
+        try? modelContext.save()
         WidgetCenter.shared.reloadAllTimelines()
         dismiss()
     }

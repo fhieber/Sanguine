@@ -368,6 +368,7 @@ struct AddReadingView: View {
         guard let v = parsedValue else { return }
         modelContext.insert(Reading(value: v, recordedAt: date, note: note))
         upsertPlannedDays(days, doses: allDoses, into: modelContext)
+        try? modelContext.save()
         WidgetCenter.shared.reloadAllTimelines()
         dismiss()
     }

@@ -157,7 +157,7 @@ struct SanguineWidgetEntryView: View {
                           (staleReading || entry.readingInRange == false ? .red : .green))
                         .font(isSmall ? .body : .title2)
                     VStack(alignment: .leading, spacing: 1) {
-                        Text(daysSinceReading.map { "Reading (\($0)d ago)" } ?? "Reading")
+                        Text(daysSinceReading.map { "Reading\n\($0)d ago" } ?? "Reading")
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                         HStack(alignment: .firstTextBaseline, spacing: 4) {
@@ -186,12 +186,10 @@ struct SanguineWidgetEntryView: View {
                         .foregroundStyle(entry.todayDoseTaken ? .green : (entry.todayDose != nil ? .primary : .red))
                         .font(isSmall ? .body : .title2)
                     VStack(alignment: .leading, spacing: 1) {
-                        Text(entry.todayDoseTaken && entry.todayDoseActualTime != nil
-                             ? "Today \(entry.todayDoseActualTime!)"
-                             : "Today \(entry.doseTimeLocal)")
+                        Text("Today\n\(entry.todayDoseTaken && entry.todayDoseActualTime != nil ? entry.todayDoseActualTime! : entry.doseTimeLocal)")
                             .font(.caption2)
                             .foregroundStyle(.secondary)
-                            .lineLimit(1)
+                            .lineLimit(2)
                             .minimumScaleFactor(0.7)
                         if entry.todayDoseTaken {
                             Text(entry.todayDose?.doseFormatted ?? "—")
@@ -233,7 +231,7 @@ struct SanguineWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: SanguineProvider()) { entry in
             SanguineWidgetEntryView(entry: entry)
-                .containerBackground(.fill.tertiary, for: .widget)
+                .containerBackground(.clear, for: .widget)
         }
         .configurationDisplayName("Sanguine")
         .description("Latest reading and today's dose.")

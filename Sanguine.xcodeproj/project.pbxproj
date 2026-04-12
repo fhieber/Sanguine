@@ -14,6 +14,7 @@
 		9B8151032F73EDAE006DF949 /* SanguineUITestsLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B8151022F73EDAE006DF949 /* SanguineUITestsLaunchTests.swift */; };
 		9B8151182F73EE48006DF949 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B8151102F73EE47006DF949 /* SettingsView.swift */; };
 		9B8151192F73EE48006DF949 /* CSVImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B8151112F73EE47006DF949 /* CSVImporter.swift */; };
+		9BCC00022F73EE48006DF949 /* ChartHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BCC00012F73EE47006DF949 /* ChartHelpers.swift */; };
 		9B81511A2F73EE48006DF949 /* ReadingsViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B8151122F73EE47006DF949 /* ReadingsViews.swift */; };
 		9B81511B2F73EE48006DF949 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B8151132F73EE47006DF949 /* Models.swift */; };
 		9B81511C2F73EE48006DF949 /* DoseViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B8151142F73EE47006DF949 /* DoseViews.swift */; };
@@ -84,6 +85,7 @@
 		9B0000002F99000000000001 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		9B8151102F73EE47006DF949 /* SettingsView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		9B8151112F73EE47006DF949 /* CSVImporter.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CSVImporter.swift; sourceTree = "<group>"; };
+		9BCC00012F73EE47006DF949 /* ChartHelpers.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ChartHelpers.swift; sourceTree = "<group>"; };
 		9B8151122F73EE47006DF949 /* ReadingsViews.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ReadingsViews.swift; sourceTree = "<group>"; };
 		9B8151132F73EE47006DF949 /* Models.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		9B8151142F73EE47006DF949 /* DoseViews.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = DoseViews.swift; sourceTree = "<group>"; };
@@ -170,6 +172,7 @@
 				9B0000002F99000000000001 /* Info.plist */,
 				9B8151152F73EE47006DF949 /* ContentView.swift */,
 				9B8151132F73EE47006DF949 /* Models.swift */,
+				9BCC00012F73EE47006DF949 /* ChartHelpers.swift */,
 				9B8151122F73EE47006DF949 /* ReadingsViews.swift */,
 				9B8151142F73EE47006DF949 /* DoseViews.swift */,
 				9B8151102F73EE47006DF949 /* SettingsView.swift */,
@@ -392,6 +395,7 @@
 				9B8151192F73EE48006DF949 /* CSVImporter.swift in Sources */,
 				9B81511F2F73EE48006DF949 /* SanguineApp.swift in Sources */,
 				9B8151202F73EE49006DF949 /* AppDelegate.swift in Sources */,
+				9BCC00022F73EE48006DF949 /* ChartHelpers.swift in Sources */,
 				9B81511A2F73EE48006DF949 /* ReadingsViews.swift in Sources */,
 				9B81511D2F73EE48006DF949 /* ContentView.swift in Sources */,
 				9B8151182F73EE48006DF949 /* SettingsView.swift in Sources */,

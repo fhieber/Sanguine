@@ -132,8 +132,12 @@ final class NotificationManager: Sendable {
         let center = UNUserNotificationCenter.current()
         Task {
             let pending = await center.pendingNotificationRequests()
-            let ids = pending.map(\.identifier).filter { $0.hasPrefix(Self.dosePlanIDPrefix) }
-            center.removePendingNotificationRequests(withIdentifiers: ids)
+            let pendingIDs = pending.map(\.identifier).filter { $0.hasPrefix(Self.dosePlanIDPrefix) }
+            center.removePendingNotificationRequests(withIdentifiers: pendingIDs)
+
+            let delivered = await center.deliveredNotifications()
+            let deliveredIDs = delivered.map(\.request.identifier).filter { $0.hasPrefix(Self.dosePlanIDPrefix) }
+            center.removeDeliveredNotifications(withIdentifiers: deliveredIDs)
         }
     }
 
@@ -163,6 +167,13 @@ final class NotificationManager: Sendable {
     func cancelReadingReminder() {
         UNUserNotificationCenter.current()
             .removePendingNotificationRequests(withIdentifiers: [Self.readingReminderID])
+    }
+
+    /// Removes a delivered reading reminder from the notification center without
+    /// cancelling the pending weekly schedule.
+    func removeDeliveredReadingReminder() {
+        UNUserNotificationCenter.current()
+            .removeDeliveredNotifications(withIdentifiers: [Self.readingReminderID])
     }
 
     func updateReadingReminder(enabled: Bool, weekday: Int, hour: Int, minute: Int) {

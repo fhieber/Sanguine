@@ -52,8 +52,11 @@ extension View {
         let fmt: Date.FormatStyle = spansYears
             ? .dateTime.month(.abbreviated).day().year()
             : .dateTime.month(.abbreviated).day()
-        // Intermediate stride — gridlines only, no labels
-        let stride: Calendar.Component = days > 60 ? .month : days > 14 ? .weekOfYear : .day
+        // Evenly-spaced intermediate gridlines — 3 divisions keeps spacing consistent
+        // regardless of where in history the user has scrolled.
+        let intermediates: [Date] = days > 2 ? (1...3).map { i in
+            visibleStart.addingTimeInterval(visibleSpan * Double(i) / 4)
+        } : []
         return self.chartXAxis {
             AxisMarks(values: [visibleStart, visibleEnd]) { value in
                 AxisGridLine()
@@ -63,9 +66,8 @@ extension View {
                     }
                 }
             }
-            // Intermediate gridlines for visual reference; skip for ≤2d where boundaries are close enough
-            if days > 2 {
-                AxisMarks(values: .stride(by: stride)) {
+            if !intermediates.isEmpty {
+                AxisMarks(values: intermediates) {
                     AxisGridLine()
                 }
             }

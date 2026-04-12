@@ -43,6 +43,8 @@ struct DoseTab: View {
     @State private var showingAdd = false
     @State private var deepLinkEntry: DoseEntry? = nil
     @State private var chartScrollDate: Date = .now
+    @State private var statsScrollDate: Date = .now
+    @State private var debounceTask: Task<Void, Never>? = nil
 
     private var chartWindowDuration: TimeInterval? {
         customRange.map { $0.end.timeIntervalSince($0.start) } ?? selectedRange.windowDuration
@@ -71,13 +73,32 @@ struct DoseTab: View {
 
     private var filtered: [DoseEntry] {
         if let wd = chartWindowDuration {
-            let end = chartScrollDate.addingTimeInterval(wd)
-            return historical.filter { $0.date >= chartScrollDate && $0.date <= end }
+            let end = statsScrollDate.addingTimeInterval(wd)
+            return historical.filter { $0.date >= statsScrollDate && $0.date <= end }
         }
         return historical
     }
 
     private var stats: DoseStats { DoseStats(entries: filtered) }
+
+    private var dataRangeLabel: String {
+        let start: Date
+        let end: Date
+        if let wd = chartWindowDuration {
+            start = statsScrollDate
+            end = statsScrollDate.addingTimeInterval(wd)
+        } else {
+            guard let s = historical.map(\.date).min(),
+                  let e = historical.map(\.date).max() else { return "" }
+            start = s; end = e
+        }
+        let cal = Calendar.current
+        if cal.component(.year, from: start) == cal.component(.year, from: end) {
+            return "\(start.formatted(.dateTime.month(.abbreviated).day())) – \(end.formatted(.dateTime.month(.abbreviated).day()))"
+        } else {
+            return "\(start.formatted(.dateTime.month(.abbreviated).year())) – \(end.formatted(.dateTime.month(.abbreviated).year()))"
+        }
+    }
 
     private var historyRows: [DoseEntry] {
         Array(filtered.prefix(visibleCount))
@@ -164,7 +185,7 @@ struct DoseTab: View {
                     }
                 }
 
-                // History
+                // Data
                 Section {
                     if allEntries.isEmpty {
                         ContentUnavailableView(
@@ -191,7 +212,13 @@ struct DoseTab: View {
                     }
                 } header: {
                     HStack {
-                        Text("History")
+                        Text("Data")
+                        if !dataRangeLabel.isEmpty {
+                            Text(dataRangeLabel)
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                                .textCase(nil)
+                        }
                         Spacer()
                         EditButton()
                             .textCase(nil)
@@ -218,6 +245,14 @@ struct DoseTab: View {
             }
             .task { scheduleDoseNotifications() }
             .onChange(of: allEntries) { scheduleDoseNotifications() }
+            .onChange(of: chartScrollDate) { _, new in
+                debounceTask?.cancel()
+                debounceTask = Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(300))
+                    guard !Task.isCancelled else { return }
+                    statsScrollDate = new
+                }
+            }
         }
     }
 
@@ -292,29 +327,46 @@ struct DoseChartView: View {
     private var dataStart: Date { entries.min(by: { $0.date < $1.date })?.date ?? .now }
     private var dataEnd: Date   { entries.max(by: { $0.date < $1.date })?.date ?? .now }
 
+    private var visibleStart: Date { windowDuration != nil ? scrollDate : dataStart }
     private var visibleEnd: Date {
         guard let windowDuration else { return dataEnd }
         return scrollDate.addingTimeInterval(windowDuration)
     }
-    private var visibleSpan: TimeInterval { visibleEnd.timeIntervalSince(scrollDate) }
+    private var visibleSpan: TimeInterval { visibleEnd.timeIntervalSince(visibleStart) }
 
     var body: some View {
-        Chart {
-            ForEach(sorted) { e in
-                PointMark(
-                    x: .value("Date", e.date),
-                    y: .value("Dose", e.dose)
-                )
-                .foregroundStyle(Color.orange)
-                .symbolSize(50)
+        VStack(spacing: 4) {
+            Chart {
+                ForEach(sorted) { e in
+                    PointMark(
+                        x: .value("Date", e.date),
+                        y: .value("Dose", e.dose)
+                    )
+                    .foregroundStyle(Color.orange)
+                    .symbolSize(50)
+                }
+            }
+            .chartYScale(domain: yDomain)
+            .smartChartXAxis(visibleStart: visibleStart, visibleEnd: visibleEnd, visibleSpan: visibleSpan)
+            .chartYAxis {
+                AxisMarks(position: .leading)
+            }
+            .chartScrollWindow(windowDuration: windowDuration, visibleSpan: visibleSpan, scrollDate: $scrollDate, anchorDate: anchorDate)
+
+            if let wd = windowDuration, anchorDate == nil {
+                HStack {
+                    Spacer()
+                    Button {
+                        scrollDate = Date.now.addingTimeInterval(-wd)
+                    } label: {
+                        Image(systemName: "arrow.right.to.line")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
             }
         }
-        .chartYScale(domain: yDomain)
-        .smartChartXAxis(scrollDate: scrollDate, visibleEnd: visibleEnd, visibleSpan: visibleSpan)
-        .chartYAxis {
-            AxisMarks(position: .leading)
-        }
-        .chartScrollWindow(windowDuration: windowDuration, visibleSpan: visibleSpan, scrollDate: $scrollDate, anchorDate: anchorDate)
     }
 
     private var yDomain: ClosedRange<Double> {

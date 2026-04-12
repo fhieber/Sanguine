@@ -43,48 +43,30 @@ extension View {
             }
     }
 
-    /// Applies a smart date x-axis: weekly ticks for ≤60d, monthly for >60d,
-    /// month+year when the visible window crosses a calendar year boundary.
-    func smartChartXAxis(scrollDate: Date, visibleEnd: Date, visibleSpan: TimeInterval) -> some View {
+    /// Applies a boundary x-axis: always labels the left and right visible edges so the
+    /// current range is immediately obvious, plus unlabeled intermediate gridlines for context.
+    func smartChartXAxis(visibleStart: Date, visibleEnd: Date, visibleSpan: TimeInterval) -> some View {
         let days = visibleSpan / 86400
-        let spansYears = Calendar.current.component(.year, from: scrollDate) !=
+        let spansYears = Calendar.current.component(.year, from: visibleStart) !=
                          Calendar.current.component(.year, from: visibleEnd)
+        let fmt: Date.FormatStyle = spansYears
+            ? .dateTime.month(.abbreviated).day().year()
+            : .dateTime.month(.abbreviated).day()
+        // Intermediate stride — gridlines only, no labels
+        let stride: Calendar.Component = days > 60 ? .month : days > 14 ? .weekOfYear : .day
         return self.chartXAxis {
-            if spansYears {
-                AxisMarks(values: .stride(by: .month)) { value in
-                    AxisGridLine()
-                    AxisValueLabel {
-                        if let date = value.as(Date.self) {
-                            Text(date.formatted(.dateTime.month(.abbreviated).year())).font(.caption2)
-                        }
+            AxisMarks(values: [visibleStart, visibleEnd]) { value in
+                AxisGridLine()
+                AxisValueLabel(anchor: (value.as(Date.self) ?? .distantFuture) <= visibleStart ? .topLeading : .topTrailing) {
+                    if let date = value.as(Date.self) {
+                        Text(date.formatted(fmt)).font(.caption2)
                     }
                 }
-            } else if days > 60 {
-                AxisMarks(values: .stride(by: .month)) { value in
+            }
+            // Intermediate gridlines for visual reference; skip for ≤2d where boundaries are close enough
+            if days > 2 {
+                AxisMarks(values: .stride(by: stride)) {
                     AxisGridLine()
-                    AxisValueLabel {
-                        if let date = value.as(Date.self) {
-                            Text(date.formatted(.dateTime.month(.abbreviated))).font(.caption2)
-                        }
-                    }
-                }
-            } else if days > 7 {
-                AxisMarks(values: .stride(by: .weekOfYear)) { value in
-                    AxisGridLine()
-                    AxisValueLabel {
-                        if let date = value.as(Date.self) {
-                            Text(date.formatted(.dateTime.month(.abbreviated).day())).font(.caption2)
-                        }
-                    }
-                }
-            } else {
-                AxisMarks(values: .automatic(desiredCount: 4)) { value in
-                    AxisGridLine()
-                    AxisValueLabel {
-                        if let date = value.as(Date.self) {
-                            Text(date.formatted(.dateTime.month(.abbreviated).day())).font(.caption2)
-                        }
-                    }
                 }
             }
         }

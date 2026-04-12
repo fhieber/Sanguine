@@ -370,6 +370,7 @@ struct AddReadingView: View {
         upsertPlannedDays(days, doses: allDoses, into: modelContext)
         try? modelContext.save()
         WidgetCenter.shared.reloadAllTimelines()
+        NotificationManager.shared.removeDeliveredReadingReminder()
         dismiss()
     }
 }

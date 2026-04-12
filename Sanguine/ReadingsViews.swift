@@ -550,17 +550,15 @@ struct ReadingChartView: View {
         .chartScrollWindow(windowDuration: windowDuration, visibleSpan: visibleSpan, scrollDate: $scrollDate, anchorDate: anchorDate)
 
         HStack {
-            if !trendPoints.isEmpty {
-                HStack(spacing: 4) {
-                    Rectangle().fill(Color.blue.opacity(0.6)).frame(width: 16, height: 2)
-                    Text("Reading").font(.caption2).foregroundStyle(.secondary)
-                }
-                HStack(spacing: 4) {
-                    Line().stroke(Color.orange.opacity(0.85), style: StrokeStyle(lineWidth: 2, dash: [4, 3])).frame(width: 16, height: 2)
-                    Text(trendDegree.map { trendLabel($0) } ?? "Trend").font(.caption2).foregroundStyle(.secondary)
-                }
-                Spacer()
+            HStack(spacing: 4) {
+                Rectangle().fill(Color.blue.opacity(0.6)).frame(width: 16, height: 2)
+                Text("Reading").font(.caption2).foregroundStyle(.secondary)
             }
+            HStack(spacing: 4) {
+                Line().stroke(Color.orange.opacity(0.85), style: StrokeStyle(lineWidth: 2, dash: [4, 3])).frame(width: 16, height: 2)
+                Text(trendDegree.map { trendLabel($0) } ?? "Trend").font(.caption2).foregroundStyle(.secondary)
+            }
+            Spacer()
             Button {
                 showTrend.toggle()
             } label: {

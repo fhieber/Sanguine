@@ -59,6 +59,15 @@ struct ReadingsTab: View {
         customRange.map { $0.end.timeIntervalSince($0.start) } ?? selectedRange.windowDuration
     }
 
+    /// Non-nil for custom ranges and YTD, which have a fixed start date rather than a rolling offset.
+    /// Passing an anchorDate to chartScrollWindow suppresses its onChange(of: windowDuration) handler,
+    /// preventing a feedback loop where YTD's ever-growing windowDuration triggers scroll updates every frame.
+    private var chartAnchorDate: Date? {
+        if let start = customRange?.start { return start }
+        if selectedRange == .yearToDate { return Calendar.current.startOfYear(for: .now) }
+        return nil
+    }
+
     private var filtered: [Reading] {
         if let wd = chartWindowDuration {
             let end = statsScrollDate.addingTimeInterval(wd)
@@ -83,7 +92,7 @@ struct ReadingsTab: View {
                             lowTarget: lowTarget,
                             highTarget: highTarget,
                             windowDuration: chartWindowDuration,
-                            anchorDate: customRange?.start,
+                            anchorDate: chartAnchorDate,
                             scrollDate: $chartScrollDate,
                             trendPoints: trendPoints,
                             trendDegree: trendDegree,

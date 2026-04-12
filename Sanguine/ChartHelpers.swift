@@ -1,6 +1,20 @@
 import SwiftUI
 import Charts
 
+// MARK: - Range protocol
+
+/// Any enum that can produce a cutoff date gets `windowDuration` for free.
+protocol ChartRange {
+    func cutoff() -> Date?
+}
+
+extension ChartRange {
+    var windowDuration: TimeInterval? {
+        guard let cutoff = cutoff() else { return nil }
+        return Date.now.timeIntervalSince(cutoff)
+    }
+}
+
 // MARK: - Shared chart scroll + x-axis helpers
 
 extension View {

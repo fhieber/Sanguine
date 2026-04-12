@@ -5,7 +5,7 @@ import WidgetKit
 
 // MARK: - Stats Range
 
-enum StatsRange: String, CaseIterable {
+enum StatsRange: String, CaseIterable, ChartRange {
     case lastMonth   = "1M"
     case last3Months = "3M"
     case last6Months = "6M"
@@ -25,11 +25,6 @@ enum StatsRange: String, CaseIterable {
         }
     }
 
-    /// Duration of the sliding window in seconds. nil = show all data, no scrolling.
-    var windowDuration: TimeInterval? {
-        guard let cutoff = cutoff() else { return nil }
-        return Date.now.timeIntervalSince(cutoff)
-    }
 }
 
 private extension Calendar {
@@ -420,10 +415,9 @@ struct ReadingChartView: View {
 
     private var sorted: [Reading] { readings.sorted { $0.recordedAt < $1.recordedAt } }
 
-    private var dataStart: Date { sorted.first?.recordedAt ?? .now }
-    private var dataEnd: Date   { sorted.last?.recordedAt  ?? .now }
+    private var dataStart: Date { readings.min(by: { $0.recordedAt < $1.recordedAt })?.recordedAt ?? .now }
+    private var dataEnd: Date   { readings.max(by: { $0.recordedAt < $1.recordedAt })?.recordedAt ?? .now }
 
-    /// Readings visible in the current scroll window.
     private var visibleReadings: [Reading] {
         guard let windowDuration else { return readings }
         let end = scrollDate.addingTimeInterval(windowDuration)
@@ -443,7 +437,7 @@ struct ReadingChartView: View {
 
     private var trendPoints: [TrendPoint] {
         guard let trend else { return [] }
-        let steps = max(20, visibleReadings.count * 2)
+        let steps = 40
         return (0 ..< steps).map { i in
             let fraction = Double(i) / Double(steps - 1)
             let date = trend.t0.addingTimeInterval(trend.tScale * fraction)

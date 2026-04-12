@@ -5,7 +5,7 @@ import WidgetKit
 
 // MARK: - Dose Range
 
-enum DoseRange: String, CaseIterable {
+enum DoseRange: String, CaseIterable, ChartRange {
     case last7Days  = "7D"
     case last2Weeks = "2W"
     case lastMonth  = "1M"
@@ -23,10 +23,6 @@ enum DoseRange: String, CaseIterable {
         }
     }
 
-    var windowDuration: TimeInterval? {
-        guard let cutoff = cutoff() else { return nil }
-        return Date.now.timeIntervalSince(cutoff)
-    }
 }
 
 // MARK: - Dose Tab
@@ -293,8 +289,8 @@ struct DoseChartView: View {
     @Binding var scrollDate: Date
 
     private var sorted: [DoseEntry] { entries.sorted { $0.date < $1.date } }
-    private var dataStart: Date { sorted.first?.date ?? .now }
-    private var dataEnd: Date   { sorted.last?.date  ?? .now }
+    private var dataStart: Date { entries.min(by: { $0.date < $1.date })?.date ?? .now }
+    private var dataEnd: Date   { entries.max(by: { $0.date < $1.date })?.date ?? .now }
 
     private var visibleEnd: Date {
         guard let windowDuration else { return dataEnd }

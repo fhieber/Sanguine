@@ -152,7 +152,7 @@ struct SanguineWidgetEntryView: View {
                     let readingTakenToday = entry.readingDate.map { Calendar.current.isDateInToday($0) } ?? false
                     let showReadingCalendar = entry.isReadingReminderToday && !readingTakenToday
                     Image(systemName: showReadingCalendar ? "calendar.circle.fill" :
-                          (staleReading || entry.readingInRange == false ? "exclamationmark.circle.fill" : "checkmark.circle.fill"))
+                          (staleReading ? "exclamationmark.circle.fill" : "checkmark.circle.fill"))
                         .foregroundStyle(showReadingCalendar ? .primary :
                           (staleReading || entry.readingInRange == false ? .red : .green))
                         .font(isSmall ? .body : .title2)

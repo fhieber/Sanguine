@@ -5,7 +5,7 @@ import WidgetKit
 
 // MARK: - Dose Range
 
-enum DoseRange: String, CaseIterable {
+enum DoseRange: String, CaseIterable, ChartRange {
     case last7Days  = "7D"
     case last2Weeks = "2W"
     case lastMonth  = "1M"
@@ -22,6 +22,7 @@ enum DoseRange: String, CaseIterable {
         case .allTime:     return nil
         }
     }
+
 }
 
 // MARK: - Dose Tab
@@ -41,6 +42,11 @@ struct DoseTab: View {
     @State private var visibleCount = 5
     @State private var showingAdd = false
     @State private var deepLinkEntry: DoseEntry? = nil
+    @State private var chartScrollDate: Date = .now
+
+    private var chartWindowDuration: TimeInterval? {
+        customRange.map { $0.end.timeIntervalSince($0.start) } ?? selectedRange.windowDuration
+    }
 
     private var plannedTimeLabel: String {
         doseTimeLabel(hour: doseHour, minute: doseMinute, timezoneID: doseTimezoneID)
@@ -64,11 +70,11 @@ struct DoseTab: View {
     }
 
     private var filtered: [DoseEntry] {
-        if let custom = customRange {
-            return historical.filter { $0.date >= custom.start && $0.date <= custom.end }
+        if let wd = chartWindowDuration {
+            let end = chartScrollDate.addingTimeInterval(wd)
+            return historical.filter { $0.date >= chartScrollDate && $0.date <= end }
         }
-        guard let cutoff = selectedRange.cutoff() else { return historical }
-        return historical.filter { $0.date >= cutoff }
+        return historical
     }
 
     private var stats: DoseStats { DoseStats(entries: filtered) }
@@ -135,11 +141,16 @@ struct DoseTab: View {
                 }
 
                 // Dose chart
-                if filtered.count >= 2 {
+                if historical.count >= 2 {
                     Section {
-                        DoseChartView(entries: filtered)
-                            .frame(height: 220)
-                            .listRowInsets(EdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8))
+                        DoseChartView(
+                            entries: historical,
+                            windowDuration: chartWindowDuration,
+                            anchorDate: customRange?.start,
+                            scrollDate: $chartScrollDate
+                        )
+                        .frame(height: 220)
+                        .listRowInsets(EdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8))
                     } header: {
                         rangePicker
                     }
@@ -273,8 +284,19 @@ struct DoseTab: View {
 
 struct DoseChartView: View {
     let entries: [DoseEntry]
+    let windowDuration: TimeInterval?
+    var anchorDate: Date? = nil
+    @Binding var scrollDate: Date
 
     private var sorted: [DoseEntry] { entries.sorted { $0.date < $1.date } }
+    private var dataStart: Date { entries.min(by: { $0.date < $1.date })?.date ?? .now }
+    private var dataEnd: Date   { entries.max(by: { $0.date < $1.date })?.date ?? .now }
+
+    private var visibleEnd: Date {
+        guard let windowDuration else { return dataEnd }
+        return scrollDate.addingTimeInterval(windowDuration)
+    }
+    private var visibleSpan: TimeInterval { visibleEnd.timeIntervalSince(scrollDate) }
 
     var body: some View {
         Chart {
@@ -288,15 +310,11 @@ struct DoseChartView: View {
             }
         }
         .chartYScale(domain: yDomain)
-        .chartXAxis {
-            AxisMarks(values: .automatic(desiredCount: 4)) { _ in
-                AxisGridLine()
-                AxisValueLabel(format: .dateTime.month(.abbreviated).day())
-            }
-        }
+        .smartChartXAxis(scrollDate: scrollDate, visibleEnd: visibleEnd, visibleSpan: visibleSpan)
         .chartYAxis {
             AxisMarks(position: .leading)
         }
+        .chartScrollWindow(windowDuration: windowDuration, visibleSpan: visibleSpan, scrollDate: $scrollDate, anchorDate: anchorDate)
     }
 
     private var yDomain: ClosedRange<Double> {

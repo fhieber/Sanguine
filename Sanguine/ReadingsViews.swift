@@ -5,7 +5,7 @@ import WidgetKit
 
 // MARK: - Stats Range
 
-enum StatsRange: String, CaseIterable {
+enum StatsRange: String, CaseIterable, ChartRange {
     case lastMonth   = "1M"
     case last3Months = "3M"
     case last6Months = "6M"
@@ -24,6 +24,7 @@ enum StatsRange: String, CaseIterable {
         case .allTime:     return nil
         }
     }
+
 }
 
 private extension Calendar {
@@ -43,15 +44,20 @@ struct ReadingsTab: View {
     @State private var selectedRange: StatsRange = .last6Months
     @State private var customRange: (start: Date, end: Date)? = nil
     @State private var showingCustomPicker = false
+    @State private var chartScrollDate: Date = .now
     @AppStorage("readingLowTarget", store: .appGroup) private var lowTarget: Double = 2.0
     @AppStorage("readingHighTarget", store: .appGroup) private var highTarget: Double = 3.0
 
+    private var chartWindowDuration: TimeInterval? {
+        customRange.map { $0.end.timeIntervalSince($0.start) } ?? selectedRange.windowDuration
+    }
+
     private var filtered: [Reading] {
-        if let custom = customRange {
-            return readings.filter { $0.recordedAt >= custom.start && $0.recordedAt <= custom.end }
+        if let wd = chartWindowDuration {
+            let end = chartScrollDate.addingTimeInterval(wd)
+            return readings.filter { $0.recordedAt >= chartScrollDate && $0.recordedAt <= end }
         }
-        guard let cutoff = selectedRange.cutoff() else { return readings }
-        return readings.filter { $0.recordedAt >= cutoff }
+        return Array(readings)
     }
 
     private var stats: ReadingStats { ReadingStats(readings: filtered, lowTarget: lowTarget, highTarget: highTarget) }
@@ -63,11 +69,18 @@ struct ReadingsTab: View {
     var body: some View {
         NavigationStack {
             List {
-                if filtered.count >= 2 {
+                if readings.count >= 2 {
                     Section {
-                        ReadingChartView(readings: filtered, lowTarget: lowTarget, highTarget: highTarget)
-                            .frame(height: 220)
-                            .listRowInsets(EdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8))
+                        ReadingChartView(
+                            readings: Array(readings),
+                            lowTarget: lowTarget,
+                            highTarget: highTarget,
+                            windowDuration: chartWindowDuration,
+                            anchorDate: customRange?.start,
+                            scrollDate: $chartScrollDate
+                        )
+                        .frame(height: 220)
+                        .listRowInsets(EdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8))
                     } header: {
                         rangePicker
                     }
@@ -393,15 +406,38 @@ struct ReadingChartView: View {
     let readings: [Reading]
     let lowTarget: Double
     let highTarget: Double
+    /// Fixed window size in seconds. nil = show all data without scrolling.
+    let windowDuration: TimeInterval?
+    /// When set, the chart jumps to this date instead of keeping the current center.
+    var anchorDate: Date? = nil
+    /// Bound to parent so stats update as the user pans.
+    @Binding var scrollDate: Date
+
     private var sorted: [Reading] { readings.sorted { $0.recordedAt < $1.recordedAt } }
 
+    private var dataStart: Date { readings.min(by: { $0.recordedAt < $1.recordedAt })?.recordedAt ?? .now }
+    private var dataEnd: Date   { readings.max(by: { $0.recordedAt < $1.recordedAt })?.recordedAt ?? .now }
+
+    private var visibleReadings: [Reading] {
+        guard let windowDuration else { return readings }
+        let end = scrollDate.addingTimeInterval(windowDuration)
+        return readings.filter { $0.recordedAt >= scrollDate && $0.recordedAt <= end }
+    }
+
+    private var visibleEnd: Date {
+        guard let windowDuration else { return dataEnd }
+        return scrollDate.addingTimeInterval(windowDuration)
+    }
+
+    private var visibleSpan: TimeInterval { visibleEnd.timeIntervalSince(scrollDate) }
+
     private var trend: ReadingTrend? {
-        readings.count >= 3 ? ReadingTrend.compute(from: readings) : nil
+        visibleReadings.count >= 3 ? ReadingTrend.compute(from: visibleReadings) : nil
     }
 
     private var trendPoints: [TrendPoint] {
         guard let trend else { return [] }
-        let steps = max(20, readings.count * 2)
+        let steps = 40 // sufficient for smooth curve on iPhone; revisit for wider displays
         return (0 ..< steps).map { i in
             let fraction = Double(i) / Double(steps - 1)
             let date = trend.t0.addingTimeInterval(trend.tScale * fraction)
@@ -413,15 +449,13 @@ struct ReadingChartView: View {
         VStack(spacing: 8) {
         Chart {
             // Target range band
-            if let first = sorted.first, let last = sorted.last {
-                RectangleMark(
-                    xStart: .value("Start", first.recordedAt),
-                    xEnd: .value("End", last.recordedAt),
-                    yStart: .value("Low", lowTarget),
-                    yEnd: .value("High", highTarget)
-                )
-                .foregroundStyle(Color.green.opacity(0.08))
-            }
+            RectangleMark(
+                xStart: .value("Start", dataStart),
+                xEnd:   .value("End",   dataEnd),
+                yStart: .value("Low",   lowTarget),
+                yEnd:   .value("High",  highTarget)
+            )
+            .foregroundStyle(Color.green.opacity(0.08))
 
             // Target range lines
             RuleMark(y: .value("Low", lowTarget))
@@ -477,19 +511,16 @@ struct ReadingChartView: View {
             }
         }
         .chartYScale(domain: yDomain)
-        .chartXAxis {
-            AxisMarks(values: .automatic(desiredCount: 4)) { _ in
-                AxisGridLine()
-                AxisValueLabel(format: .dateTime.month(.abbreviated).day())
-            }
-        }
+        .smartChartXAxis(scrollDate: scrollDate, visibleEnd: visibleEnd, visibleSpan: visibleSpan)
         .chartYAxis {
             AxisMarks(position: .leading)
         }
         .chartLegend(.hidden)
+        .chartScrollWindow(windowDuration: windowDuration, visibleSpan: visibleSpan, scrollDate: $scrollDate, anchorDate: anchorDate)
 
         if !trendPoints.isEmpty {
             HStack(spacing: 12) {
+                Spacer()
                 HStack(spacing: 4) {
                     Rectangle().fill(Color.blue.opacity(0.6)).frame(width: 16, height: 2)
                     Text("Reading").font(.caption2).foregroundStyle(.secondary)
@@ -540,11 +571,13 @@ struct ReadingStatsGrid: View {
             )
             StatCard(
                 title: "Min",
-                value: stats.minimum.map { String(format: "%.1f", $0) } ?? "—"
+                value: stats.minimum.map { String(format: "%.1f", $0) } ?? "—",
+                subtitle: stats.minimumReading.map { $0.recordedAt.formatted(date: .abbreviated, time: .omitted) }
             )
             StatCard(
                 title: "Max",
-                value: stats.maximum.map { String(format: "%.1f", $0) } ?? "—"
+                value: stats.maximum.map { String(format: "%.1f", $0) } ?? "—",
+                subtitle: stats.maximumReading.map { $0.recordedAt.formatted(date: .abbreviated, time: .omitted) }
             )
             StatCard(
                 title: "Time in Range",

@@ -198,7 +198,7 @@ struct ReadingsTab: View {
                 }
             }
             .onChange(of: statsScrollDate) { _, _ in
-                if showTrend { showTrend = false }
+                if showTrend { recomputeTrend() }
             }
             .onChange(of: showTrend) { _, on in
                 if on { recomputeTrend() } else { trendPoints = []; trendDegree = nil }
@@ -493,12 +493,13 @@ struct ReadingChartView: View {
     private var dataStart: Date { readings.min(by: { $0.recordedAt < $1.recordedAt })?.recordedAt ?? .now }
     private var dataEnd: Date   { readings.max(by: { $0.recordedAt < $1.recordedAt })?.recordedAt ?? .now }
 
+    private var visibleStart: Date { windowDuration != nil ? scrollDate : dataStart }
     private var visibleEnd: Date {
         guard let windowDuration else { return dataEnd }
         return scrollDate.addingTimeInterval(windowDuration)
     }
 
-    private var visibleSpan: TimeInterval { visibleEnd.timeIntervalSince(scrollDate) }
+    private var visibleSpan: TimeInterval { visibleEnd.timeIntervalSince(visibleStart) }
 
     var body: some View {
         VStack(spacing: 8) {
@@ -566,7 +567,7 @@ struct ReadingChartView: View {
             }
         }
         .chartYScale(domain: yDomain)
-        .smartChartXAxis(scrollDate: scrollDate, visibleEnd: visibleEnd, visibleSpan: visibleSpan)
+        .smartChartXAxis(visibleStart: visibleStart, visibleEnd: visibleEnd, visibleSpan: visibleSpan)
         .chartYAxis {
             AxisMarks(position: .leading)
         }

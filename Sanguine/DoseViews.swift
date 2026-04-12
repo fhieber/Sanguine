@@ -327,11 +327,12 @@ struct DoseChartView: View {
     private var dataStart: Date { entries.min(by: { $0.date < $1.date })?.date ?? .now }
     private var dataEnd: Date   { entries.max(by: { $0.date < $1.date })?.date ?? .now }
 
+    private var visibleStart: Date { windowDuration != nil ? scrollDate : dataStart }
     private var visibleEnd: Date {
         guard let windowDuration else { return dataEnd }
         return scrollDate.addingTimeInterval(windowDuration)
     }
-    private var visibleSpan: TimeInterval { visibleEnd.timeIntervalSince(scrollDate) }
+    private var visibleSpan: TimeInterval { visibleEnd.timeIntervalSince(visibleStart) }
 
     var body: some View {
         VStack(spacing: 4) {
@@ -346,7 +347,7 @@ struct DoseChartView: View {
                 }
             }
             .chartYScale(domain: yDomain)
-            .smartChartXAxis(scrollDate: scrollDate, visibleEnd: visibleEnd, visibleSpan: visibleSpan)
+            .smartChartXAxis(visibleStart: visibleStart, visibleEnd: visibleEnd, visibleSpan: visibleSpan)
             .chartYAxis {
                 AxisMarks(position: .leading)
             }

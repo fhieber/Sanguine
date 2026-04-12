@@ -421,3 +421,98 @@ final class CSVRoundtripTests: XCTestCase {
         XCTAssertEqual(second.skipped, 1)
     }
 }
+
+// MARK: - Polynomial Trendline Tests
+
+final class PolynomialTrendTests: XCTestCase {
+
+    // MARK: PolynomialFit
+
+    func testLinearFitThroughTwoPoints() {
+        // y = 2x + 1 → coefficients[0]=1, coefficients[1]=2
+        let fit = PolynomialFit.fit(normalizedX: [0.0, 1.0], y: [1.0, 3.0], degree: 1)
+        XCTAssertNotNil(fit)
+        XCTAssertEqual(fit!.evaluate(at: 0.0), 1.0, accuracy: 1e-9)
+        XCTAssertEqual(fit!.evaluate(at: 1.0), 3.0, accuracy: 1e-9)
+        XCTAssertEqual(fit!.evaluate(at: 0.5), 2.0, accuracy: 1e-9)
+    }
+
+    func testQuadraticFitExact() {
+        // y = x^2 sampled at 0, 0.5, 1 → values 0, 0.25, 1
+        let xs = [0.0, 0.5, 1.0]
+        let ys = [0.0, 0.25, 1.0]
+        let fit = PolynomialFit.fit(normalizedX: xs, y: ys, degree: 2)
+        XCTAssertNotNil(fit)
+        XCTAssertEqual(fit!.evaluate(at: 0.0),  0.0,    accuracy: 1e-9)
+        XCTAssertEqual(fit!.evaluate(at: 0.5),  0.25,   accuracy: 1e-9)
+        XCTAssertEqual(fit!.evaluate(at: 1.0),  1.0,    accuracy: 1e-9)
+        XCTAssertEqual(fit!.evaluate(at: 0.25), 0.0625, accuracy: 1e-9)
+    }
+
+    func testFitReturnsNilWhenInsufficientPoints() {
+        // degree 2 requires >= 3 points; provide only 2
+        let fit = PolynomialFit.fit(normalizedX: [0.0, 1.0], y: [1.0, 2.0], degree: 2)
+        XCTAssertNil(fit)
+    }
+
+    func testFitReturnsNilForDegenerateIdenticalX() {
+        // All x the same → singular Vandermonde matrix
+        let fit = PolynomialFit.fit(normalizedX: [0.5, 0.5, 0.5], y: [1.0, 2.0, 3.0], degree: 1)
+        XCTAssertNil(fit)
+    }
+
+    func testBICPenalizesHigherDegreeOnLinearData() {
+        // Perfect linear data: BIC should favour degree 1 over degree 2
+        let xs = stride(from: 0.0, through: 1.0, by: 0.1).map { $0 }
+        let ys = xs.map { 2.0 * $0 + 1.0 }
+        let fit1 = PolynomialFit.fit(normalizedX: xs, y: ys, degree: 1)!
+        let fit2 = PolynomialFit.fit(normalizedX: xs, y: ys, degree: 2)!
+        let bic1 = fit1.computeBIC(normalizedX: xs, y: ys)
+        let bic2 = fit2.computeBIC(normalizedX: xs, y: ys)
+        XCTAssertLessThan(bic1, bic2)
+    }
+
+    // MARK: ReadingTrend
+
+    func testReadingTrendNilForFewerThan3Readings() {
+        let rs = [Reading(value: 2.0, recordedAt: .now),
+                  Reading(value: 2.5, recordedAt: .now.addingTimeInterval(86400))]
+        XCTAssertNil(ReadingTrend.compute(from: rs))
+    }
+
+    func testReadingTrendNilForSameTimestamp() {
+        let t = Date()
+        let rs = (0 ..< 5).map { _ in Reading(value: 2.5, recordedAt: t) }
+        XCTAssertNil(ReadingTrend.compute(from: rs))
+    }
+
+    func testReadingTrendEvaluatesConstantReadings() {
+        // 5 constant readings → trend ≈ 2.5 at both endpoints
+        let base = date("2026-01-01T08:00:00+00:00")
+        let rs = (0 ..< 5).map { i in Reading(value: 2.5, recordedAt: base.addingTimeInterval(Double(i) * 86400)) }
+        guard let trend = ReadingTrend.compute(from: rs) else { return XCTFail("Expected non-nil trend") }
+        XCTAssertEqual(trend.evaluate(at: base),                              2.5, accuracy: 0.001)
+        XCTAssertEqual(trend.evaluate(at: base.addingTimeInterval(4 * 86400)), 2.5, accuracy: 0.001)
+    }
+
+    func testReadingTrendPicksLinearForLinearData() {
+        // 10 readings with value = day index (linear) → BIC selects degree 1
+        let base = date("2026-01-01T08:00:00+00:00")
+        let rs = (0 ..< 10).map { i in Reading(value: Double(i), recordedAt: base.addingTimeInterval(Double(i) * 86400)) }
+        guard let trend = ReadingTrend.compute(from: rs) else { return XCTFail("Expected non-nil trend") }
+        XCTAssertEqual(trend.fit.degree, 1)
+    }
+
+    func testReadingTrendMidpointAccuracyForKnownParabola() {
+        // y = (x - 0.5)^2, vertex at midpoint should evaluate to ~0.0
+        let base = date("2026-01-01T08:00:00+00:00")
+        let span: TimeInterval = 4 * 86400
+        let fractions = [0.0, 0.25, 0.5, 0.75, 1.0]
+        let rs = fractions.map { f in
+            Reading(value: pow(f - 0.5, 2), recordedAt: base.addingTimeInterval(f * span))
+        }
+        guard let trend = ReadingTrend.compute(from: rs) else { return XCTFail("Expected non-nil trend") }
+        let midDate = base.addingTimeInterval(0.5 * span)
+        XCTAssertEqual(trend.evaluate(at: midDate), 0.0, accuracy: 0.001)
+    }
+}

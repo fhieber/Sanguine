@@ -377,12 +377,29 @@ struct AddReadingView: View {
 
 // MARK: - Reading Chart
 
+private struct TrendPoint: Identifiable {
+    let id: Int
+    let date: Date
+    let value: Double
+}
+
 struct ReadingChartView: View {
     let readings: [Reading]
     let lowTarget: Double
     let highTarget: Double
 
     private var sorted: [Reading] { readings.sorted { $0.recordedAt < $1.recordedAt } }
+
+    private var trendPoints: [TrendPoint] {
+        guard readings.count >= 3,
+              let trend = ReadingTrend.compute(from: readings) else { return [] }
+        let steps = 100
+        return (0 ..< steps).map { i in
+            let fraction = Double(i) / Double(steps - 1)
+            let date = trend.t0.addingTimeInterval(trend.tScale * fraction)
+            return TrendPoint(id: i, date: date, value: trend.evaluate(at: date))
+        }
+    }
 
     var body: some View {
         Chart {
@@ -424,6 +441,19 @@ struct ReadingChartView: View {
                 )
                 .foregroundStyle(Color.blue.opacity(0.6))
                 .interpolationMethod(.catmullRom)
+            }
+
+            // Polynomial trendline
+            if !trendPoints.isEmpty {
+                ForEach(trendPoints) { pt in
+                    LineMark(
+                        x: .value("Date", pt.date),
+                        y: .value("Trend", pt.value)
+                    )
+                    .foregroundStyle(Color.orange.opacity(0.85))
+                    .lineStyle(StrokeStyle(lineWidth: 2))
+                    .interpolationMethod(.linear)
+                }
             }
 
             // Points

@@ -43,6 +43,8 @@ struct DoseTab: View {
     @State private var showingAdd = false
     @State private var deepLinkEntry: DoseEntry? = nil
     @State private var chartScrollDate: Date = .now
+    @State private var statsScrollDate: Date = .now
+    @State private var debounceTask: Task<Void, Never>? = nil
 
     private var chartWindowDuration: TimeInterval? {
         customRange.map { $0.end.timeIntervalSince($0.start) } ?? selectedRange.windowDuration
@@ -71,8 +73,8 @@ struct DoseTab: View {
 
     private var filtered: [DoseEntry] {
         if let wd = chartWindowDuration {
-            let end = chartScrollDate.addingTimeInterval(wd)
-            return historical.filter { $0.date >= chartScrollDate && $0.date <= end }
+            let end = statsScrollDate.addingTimeInterval(wd)
+            return historical.filter { $0.date >= statsScrollDate && $0.date <= end }
         }
         return historical
     }
@@ -218,6 +220,14 @@ struct DoseTab: View {
             }
             .task { scheduleDoseNotifications() }
             .onChange(of: allEntries) { scheduleDoseNotifications() }
+            .onChange(of: chartScrollDate) { _, new in
+                debounceTask?.cancel()
+                debounceTask = Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(300))
+                    guard !Task.isCancelled else { return }
+                    statsScrollDate = new
+                }
+            }
         }
     }
 

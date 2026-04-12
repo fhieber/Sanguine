@@ -45,6 +45,13 @@ struct ReadingsTab: View {
     @State private var customRange: (start: Date, end: Date)? = nil
     @State private var showingCustomPicker = false
     @State private var chartScrollDate: Date = .now
+    /// Debounced copy of chartScrollDate — updated ~300ms after panning stops.
+    /// All stats, history, and trend computation use this to avoid re-rendering on every scroll frame.
+    @State private var statsScrollDate: Date = .now
+    @State private var showTrend = false
+    @State private var trendPoints: [TrendPoint] = []
+    @State private var trendDegree: Int? = nil
+    @State private var debounceTask: Task<Void, Never>? = nil
     @AppStorage("readingLowTarget", store: .appGroup) private var lowTarget: Double = 2.0
     @AppStorage("readingHighTarget", store: .appGroup) private var highTarget: Double = 3.0
 
@@ -54,8 +61,8 @@ struct ReadingsTab: View {
 
     private var filtered: [Reading] {
         if let wd = chartWindowDuration {
-            let end = chartScrollDate.addingTimeInterval(wd)
-            return readings.filter { $0.recordedAt >= chartScrollDate && $0.recordedAt <= end }
+            let end = statsScrollDate.addingTimeInterval(wd)
+            return readings.filter { $0.recordedAt >= statsScrollDate && $0.recordedAt <= end }
         }
         return Array(readings)
     }
@@ -77,7 +84,10 @@ struct ReadingsTab: View {
                             highTarget: highTarget,
                             windowDuration: chartWindowDuration,
                             anchorDate: customRange?.start,
-                            scrollDate: $chartScrollDate
+                            scrollDate: $chartScrollDate,
+                            trendPoints: trendPoints,
+                            trendDegree: trendDegree,
+                            showTrend: $showTrend
                         )
                         .frame(height: 220)
                         .listRowInsets(EdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8))
@@ -145,6 +155,33 @@ struct ReadingsTab: View {
             .sheet(isPresented: $showingCustomPicker) {
                 DateRangePickerSheet(customRange: $customRange)
             }
+            .onChange(of: chartScrollDate) { _, new in
+                debounceTask?.cancel()
+                debounceTask = Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(300))
+                    guard !Task.isCancelled else { return }
+                    statsScrollDate = new
+                }
+            }
+            .onChange(of: statsScrollDate) { _, _ in
+                if showTrend { recomputeTrend() }
+            }
+            .onChange(of: showTrend) { _, on in
+                if on { recomputeTrend() } else { trendPoints = []; trendDegree = nil }
+            }
+        }
+    }
+
+    private func recomputeTrend() {
+        guard let t = ReadingTrend.compute(from: filtered) else {
+            trendPoints = []; trendDegree = nil; return
+        }
+        let steps = 40 // sufficient for smooth curve on iPhone; revisit for wider displays
+        trendDegree = t.fit.degree
+        trendPoints = (0 ..< steps).map { i in
+            let fraction = Double(i) / Double(steps - 1)
+            let date = t.t0.addingTimeInterval(t.tScale * fraction)
+            return TrendPoint(id: i, date: date, value: t.evaluate(at: date))
         }
     }
 
@@ -396,7 +433,7 @@ private struct Line: Shape {
     }
 }
 
-private struct TrendPoint: Identifiable {
+struct TrendPoint: Identifiable {
     let id: Int
     let date: Date
     let value: Double
@@ -412,17 +449,15 @@ struct ReadingChartView: View {
     var anchorDate: Date? = nil
     /// Bound to parent so stats update as the user pans.
     @Binding var scrollDate: Date
+    /// Precomputed by parent using debounced scroll position — empty when trend is hidden.
+    let trendPoints: [TrendPoint]
+    let trendDegree: Int?
+    @Binding var showTrend: Bool
 
     private var sorted: [Reading] { readings.sorted { $0.recordedAt < $1.recordedAt } }
 
     private var dataStart: Date { readings.min(by: { $0.recordedAt < $1.recordedAt })?.recordedAt ?? .now }
     private var dataEnd: Date   { readings.max(by: { $0.recordedAt < $1.recordedAt })?.recordedAt ?? .now }
-
-    private var visibleReadings: [Reading] {
-        guard let windowDuration else { return readings }
-        let end = scrollDate.addingTimeInterval(windowDuration)
-        return readings.filter { $0.recordedAt >= scrollDate && $0.recordedAt <= end }
-    }
 
     private var visibleEnd: Date {
         guard let windowDuration else { return dataEnd }
@@ -430,20 +465,6 @@ struct ReadingChartView: View {
     }
 
     private var visibleSpan: TimeInterval { visibleEnd.timeIntervalSince(scrollDate) }
-
-    private var trend: ReadingTrend? {
-        visibleReadings.count >= 3 ? ReadingTrend.compute(from: visibleReadings) : nil
-    }
-
-    private var trendPoints: [TrendPoint] {
-        guard let trend else { return [] }
-        let steps = 40 // sufficient for smooth curve on iPhone; revisit for wider displays
-        return (0 ..< steps).map { i in
-            let fraction = Double(i) / Double(steps - 1)
-            let date = trend.t0.addingTimeInterval(trend.tScale * fraction)
-            return TrendPoint(id: i, date: date, value: trend.evaluate(at: date))
-        }
-    }
 
     var body: some View {
         VStack(spacing: 8) {
@@ -518,19 +539,27 @@ struct ReadingChartView: View {
         .chartLegend(.hidden)
         .chartScrollWindow(windowDuration: windowDuration, visibleSpan: visibleSpan, scrollDate: $scrollDate, anchorDate: anchorDate)
 
-        if !trendPoints.isEmpty {
-            HStack(spacing: 12) {
-                Spacer()
+        HStack {
+            if !trendPoints.isEmpty {
                 HStack(spacing: 4) {
                     Rectangle().fill(Color.blue.opacity(0.6)).frame(width: 16, height: 2)
                     Text("Reading").font(.caption2).foregroundStyle(.secondary)
                 }
                 HStack(spacing: 4) {
                     Line().stroke(Color.orange.opacity(0.85), style: StrokeStyle(lineWidth: 2, dash: [4, 3])).frame(width: 16, height: 2)
-                    Text(trend.map { trendLabel($0.fit.degree) } ?? "Trend").font(.caption2).foregroundStyle(.secondary)
+                    Text(trendDegree.map { trendLabel($0) } ?? "Trend").font(.caption2).foregroundStyle(.secondary)
                 }
                 Spacer()
             }
+            Button {
+                showTrend.toggle()
+            } label: {
+                Label(showTrend ? "Hide Trend" : "Trend",
+                      systemImage: showTrend ? "chart.line.uptrend.xyaxis.circle.fill" : "chart.line.uptrend.xyaxis.circle")
+                    .font(.caption2)
+                    .foregroundStyle(showTrend ? .orange : .secondary)
+            }
+            .buttonStyle(.plain)
         }
         }
     }

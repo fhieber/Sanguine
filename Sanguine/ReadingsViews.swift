@@ -165,6 +165,7 @@ struct ReadingsTab: View {
                 DateRangePickerSheet(customRange: $customRange)
             }
             .onChange(of: chartScrollDate) { _, new in
+                if showTrend { showTrend = false }
                 debounceTask?.cancel()
                 debounceTask = Task { @MainActor in
                     try? await Task.sleep(for: .milliseconds(300))

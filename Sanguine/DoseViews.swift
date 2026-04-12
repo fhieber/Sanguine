@@ -22,6 +22,11 @@ enum DoseRange: String, CaseIterable {
         case .allTime:     return nil
         }
     }
+
+    var windowDuration: TimeInterval? {
+        guard let cutoff = cutoff() else { return nil }
+        return Date.now.timeIntervalSince(cutoff)
+    }
 }
 
 // MARK: - Dose Tab
@@ -135,11 +140,15 @@ struct DoseTab: View {
                 }
 
                 // Dose chart
-                if filtered.count >= 2 {
+                if historical.count >= 2 {
                     Section {
-                        DoseChartView(entries: filtered)
-                            .frame(height: 220)
-                            .listRowInsets(EdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8))
+                        DoseChartView(
+                            entries: historical,
+                            windowDuration: customRange.map { $0.end.timeIntervalSince($0.start) } ?? selectedRange.windowDuration,
+                            anchorDate: customRange?.start
+                        )
+                        .frame(height: 220)
+                        .listRowInsets(EdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8))
                     } header: {
                         rangePicker
                     }
@@ -273,8 +282,20 @@ struct DoseTab: View {
 
 struct DoseChartView: View {
     let entries: [DoseEntry]
+    let windowDuration: TimeInterval?
+    var anchorDate: Date? = nil
+
+    @State private var scrollDate: Date = .now
 
     private var sorted: [DoseEntry] { entries.sorted { $0.date < $1.date } }
+    private var dataStart: Date { sorted.first?.date ?? .now }
+    private var dataEnd: Date   { sorted.last?.date  ?? .now }
+
+    private var visibleEnd: Date {
+        guard let windowDuration else { return dataEnd }
+        return scrollDate.addingTimeInterval(windowDuration)
+    }
+    private var visibleSpan: TimeInterval { visibleEnd.timeIntervalSince(scrollDate) }
 
     var body: some View {
         Chart {
@@ -289,14 +310,50 @@ struct DoseChartView: View {
         }
         .chartYScale(domain: yDomain)
         .chartXAxis {
-            AxisMarks(values: .automatic(desiredCount: 4)) { _ in
-                AxisGridLine()
-                AxisValueLabel(format: .dateTime.month(.abbreviated).day())
+            if Calendar.current.component(.year, from: scrollDate) !=
+               Calendar.current.component(.year, from: visibleEnd) {
+                AxisMarks(values: .stride(by: .month)) { value in
+                    AxisGridLine()
+                    AxisValueLabel {
+                        if let date = value.as(Date.self) {
+                            Text(date.formatted(.dateTime.month(.abbreviated).year()))
+                                .font(.caption2)
+                        }
+                    }
+                }
+            } else {
+                AxisMarks(values: .automatic(desiredCount: 4)) { value in
+                    AxisGridLine()
+                    AxisValueLabel {
+                        if let date = value.as(Date.self) {
+                            Text(date.formatted(.dateTime.month(.abbreviated).day()))
+                                .font(.caption2)
+                        }
+                    }
+                }
             }
         }
         .chartYAxis {
             AxisMarks(position: .leading)
         }
+        .chartScrollableAxes(windowDuration != nil ? .horizontal : [])
+        .chartXVisibleDomain(length: windowDuration ?? visibleSpan)
+        .chartScrollPosition(x: $scrollDate)
+        .onAppear { resetScroll() }
+        .onChange(of: anchorDate) { _, new in
+            if let new { scrollDate = new }
+        }
+        .onChange(of: windowDuration) { old, new in
+            guard let new else { return }
+            if anchorDate != nil { return }
+            let center = scrollDate.addingTimeInterval((old ?? new) / 2)
+            scrollDate = center.addingTimeInterval(-new / 2)
+        }
+    }
+
+    private func resetScroll() {
+        guard let windowDuration else { return }
+        scrollDate = anchorDate ?? Date.now.addingTimeInterval(-windowDuration)
     }
 
     private var yDomain: ClosedRange<Double> {

@@ -24,6 +24,12 @@ enum StatsRange: String, CaseIterable {
         case .allTime:     return nil
         }
     }
+
+    /// Duration of the sliding window in seconds. nil = show all data, no scrolling.
+    var windowDuration: TimeInterval? {
+        guard let cutoff = cutoff() else { return nil }
+        return Date.now.timeIntervalSince(cutoff)
+    }
 }
 
 private extension Calendar {
@@ -63,11 +69,17 @@ struct ReadingsTab: View {
     var body: some View {
         NavigationStack {
             List {
-                if filtered.count >= 2 {
+                if readings.count >= 2 {
                     Section {
-                        ReadingChartView(readings: filtered, lowTarget: lowTarget, highTarget: highTarget)
-                            .frame(height: 220)
-                            .listRowInsets(EdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8))
+                        ReadingChartView(
+                            readings: Array(readings),
+                            lowTarget: lowTarget,
+                            highTarget: highTarget,
+                            windowDuration: customRange.map { $0.end.timeIntervalSince($0.start) } ?? selectedRange.windowDuration,
+                            anchorDate: customRange?.start
+                        )
+                        .frame(height: 220)
+                        .listRowInsets(EdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8))
                     } header: {
                         rangePicker
                     }
@@ -393,15 +405,40 @@ struct ReadingChartView: View {
     let readings: [Reading]
     let lowTarget: Double
     let highTarget: Double
+    /// Fixed window size in seconds. nil = show all data without scrolling.
+    let windowDuration: TimeInterval?
+    /// When set, the chart jumps to this date instead of keeping the current center.
+    var anchorDate: Date? = nil
+
+    /// Leading edge of the visible window. Initialized to show the most recent data.
+    @State private var scrollDate: Date = .now
+
     private var sorted: [Reading] { readings.sorted { $0.recordedAt < $1.recordedAt } }
 
+    private var dataStart: Date { sorted.first?.recordedAt ?? .now }
+    private var dataEnd: Date   { sorted.last?.recordedAt  ?? .now }
+
+    /// Readings visible in the current scroll window.
+    private var visibleReadings: [Reading] {
+        guard let windowDuration else { return readings }
+        let end = scrollDate.addingTimeInterval(windowDuration)
+        return readings.filter { $0.recordedAt >= scrollDate && $0.recordedAt <= end }
+    }
+
+    private var visibleEnd: Date {
+        guard let windowDuration else { return dataEnd }
+        return scrollDate.addingTimeInterval(windowDuration)
+    }
+
+    private var visibleSpan: TimeInterval { visibleEnd.timeIntervalSince(scrollDate) }
+
     private var trend: ReadingTrend? {
-        readings.count >= 3 ? ReadingTrend.compute(from: readings) : nil
+        visibleReadings.count >= 3 ? ReadingTrend.compute(from: visibleReadings) : nil
     }
 
     private var trendPoints: [TrendPoint] {
         guard let trend else { return [] }
-        let steps = max(20, readings.count * 2)
+        let steps = max(20, visibleReadings.count * 2)
         return (0 ..< steps).map { i in
             let fraction = Double(i) / Double(steps - 1)
             let date = trend.t0.addingTimeInterval(trend.tScale * fraction)
@@ -413,15 +450,13 @@ struct ReadingChartView: View {
         VStack(spacing: 8) {
         Chart {
             // Target range band
-            if let first = sorted.first, let last = sorted.last {
-                RectangleMark(
-                    xStart: .value("Start", first.recordedAt),
-                    xEnd: .value("End", last.recordedAt),
-                    yStart: .value("Low", lowTarget),
-                    yEnd: .value("High", highTarget)
-                )
-                .foregroundStyle(Color.green.opacity(0.08))
-            }
+            RectangleMark(
+                xStart: .value("Start", dataStart),
+                xEnd:   .value("End",   dataEnd),
+                yStart: .value("Low",   lowTarget),
+                yEnd:   .value("High",  highTarget)
+            )
+            .foregroundStyle(Color.green.opacity(0.08))
 
             // Target range lines
             RuleMark(y: .value("Low", lowTarget))
@@ -478,18 +513,51 @@ struct ReadingChartView: View {
         }
         .chartYScale(domain: yDomain)
         .chartXAxis {
-            AxisMarks(values: .automatic(desiredCount: 4)) { _ in
-                AxisGridLine()
-                AxisValueLabel(format: .dateTime.month(.abbreviated).day())
+            if Calendar.current.component(.year, from: scrollDate) !=
+               Calendar.current.component(.year, from: visibleEnd) {
+                AxisMarks(values: .stride(by: .month)) { value in
+                    AxisGridLine()
+                    AxisValueLabel {
+                        if let date = value.as(Date.self) {
+                            Text(date.formatted(.dateTime.month(.abbreviated).year()))
+                                .font(.caption2)
+                        }
+                    }
+                }
+            } else {
+                AxisMarks(values: .automatic(desiredCount: 4)) { value in
+                    AxisGridLine()
+                    AxisValueLabel {
+                        if let date = value.as(Date.self) {
+                            Text(date.formatted(.dateTime.month(.abbreviated).day()))
+                                .font(.caption2)
+                        }
+                    }
+                }
             }
         }
         .chartYAxis {
             AxisMarks(position: .leading)
         }
         .chartLegend(.hidden)
+        .chartScrollableAxes(windowDuration != nil ? .horizontal : [])
+        .chartXVisibleDomain(length: windowDuration ?? visibleSpan)
+        .chartScrollPosition(x: $scrollDate)
+        .onAppear { resetScroll() }
+        .onChange(of: anchorDate) { _, new in
+            if let new { scrollDate = new }
+        }
+        .onChange(of: windowDuration) { old, new in
+            guard let new else { return }
+            if anchorDate != nil { return }  // custom range: anchorDate handles positioning
+            // Keep center date stable across standard range changes
+            let center = scrollDate.addingTimeInterval((old ?? new) / 2)
+            scrollDate = center.addingTimeInterval(-new / 2)
+        }
 
         if !trendPoints.isEmpty {
             HStack(spacing: 12) {
+                Spacer()
                 HStack(spacing: 4) {
                     Rectangle().fill(Color.blue.opacity(0.6)).frame(width: 16, height: 2)
                     Text("Reading").font(.caption2).foregroundStyle(.secondary)
@@ -502,6 +570,11 @@ struct ReadingChartView: View {
             }
         }
         }
+    }
+
+    private func resetScroll() {
+        guard let windowDuration else { return }
+        scrollDate = anchorDate ?? Date.now.addingTimeInterval(-windowDuration)
     }
 
     private func trendLabel(_ degree: Int) -> String {
@@ -540,11 +613,13 @@ struct ReadingStatsGrid: View {
             )
             StatCard(
                 title: "Min",
-                value: stats.minimum.map { String(format: "%.1f", $0) } ?? "—"
+                value: stats.minimum.map { String(format: "%.1f", $0) } ?? "—",
+                subtitle: stats.minimumReading.map { $0.recordedAt.formatted(date: .abbreviated, time: .omitted) }
             )
             StatCard(
                 title: "Max",
-                value: stats.maximum.map { String(format: "%.1f", $0) } ?? "—"
+                value: stats.maximum.map { String(format: "%.1f", $0) } ?? "—",
+                subtitle: stats.maximumReading.map { $0.recordedAt.formatted(date: .abbreviated, time: .omitted) }
             )
             StatCard(
                 title: "Time in Range",

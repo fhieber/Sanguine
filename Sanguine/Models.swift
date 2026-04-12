@@ -144,8 +144,10 @@ struct ReadingStats {
         guard !readings.isEmpty else { return nil }
         return readings.map(\.value).reduce(0, +) / Double(readings.count)
     }
-    var minimum: Double? { readings.map(\.value).min() }
-    var maximum: Double? { readings.map(\.value).max() }
+    var minimumReading: Reading? { readings.min(by: { $0.value < $1.value }) }
+    var maximumReading: Reading? { readings.max(by: { $0.value < $1.value }) }
+    var minimum: Double? { minimumReading?.value }
+    var maximum: Double? { maximumReading?.value }
     var stdDev: Double? {
         guard let avg = average, readings.count > 1 else { return nil }
         let variance = readings.map { pow($0.value - avg, 2) }.reduce(0, +) / Double(readings.count)

@@ -517,66 +517,12 @@ struct ReadingChartView: View {
             }
         }
         .chartYScale(domain: yDomain)
-        .chartXAxis {
-            let days = visibleSpan / 86400
-            let spansYears = Calendar.current.component(.year, from: scrollDate) !=
-                             Calendar.current.component(.year, from: visibleEnd)
-            if spansYears {
-                AxisMarks(values: .stride(by: .month)) { value in
-                    AxisGridLine()
-                    AxisValueLabel {
-                        if let date = value.as(Date.self) {
-                            Text(date.formatted(.dateTime.month(.abbreviated).year())).font(.caption2)
-                        }
-                    }
-                }
-            } else if days > 60 {
-                AxisMarks(values: .stride(by: .month)) { value in
-                    AxisGridLine()
-                    AxisValueLabel {
-                        if let date = value.as(Date.self) {
-                            Text(date.formatted(.dateTime.month(.abbreviated))).font(.caption2)
-                        }
-                    }
-                }
-            } else if days > 7 {
-                AxisMarks(values: .stride(by: .weekOfYear)) { value in
-                    AxisGridLine()
-                    AxisValueLabel {
-                        if let date = value.as(Date.self) {
-                            Text(date.formatted(.dateTime.month(.abbreviated).day())).font(.caption2)
-                        }
-                    }
-                }
-            } else {
-                AxisMarks(values: .automatic(desiredCount: 4)) { value in
-                    AxisGridLine()
-                    AxisValueLabel {
-                        if let date = value.as(Date.self) {
-                            Text(date.formatted(.dateTime.month(.abbreviated).day())).font(.caption2)
-                        }
-                    }
-                }
-            }
-        }
+        .smartChartXAxis(scrollDate: scrollDate, visibleEnd: visibleEnd, visibleSpan: visibleSpan)
         .chartYAxis {
             AxisMarks(position: .leading)
         }
         .chartLegend(.hidden)
-        .chartScrollableAxes(windowDuration != nil ? .horizontal : [])
-        .chartXVisibleDomain(length: windowDuration ?? visibleSpan)
-        .chartScrollPosition(x: $scrollDate)
-        .onAppear { resetScroll() }
-        .onChange(of: anchorDate) { _, new in
-            if let new { scrollDate = new }
-        }
-        .onChange(of: windowDuration) { old, new in
-            guard let new else { return }
-            if anchorDate != nil { return }  // custom range: anchorDate handles positioning
-            // Keep center date stable across standard range changes
-            let center = scrollDate.addingTimeInterval((old ?? new) / 2)
-            scrollDate = center.addingTimeInterval(-new / 2)
-        }
+        .chartScrollWindow(windowDuration: windowDuration, visibleSpan: visibleSpan, scrollDate: $scrollDate, anchorDate: anchorDate)
 
         if !trendPoints.isEmpty {
             HStack(spacing: 12) {
@@ -593,11 +539,6 @@ struct ReadingChartView: View {
             }
         }
         }
-    }
-
-    private func resetScroll() {
-        guard let windowDuration else { return }
-        scrollDate = anchorDate ?? Date.now.addingTimeInterval(-windowDuration)
     }
 
     private func trendLabel(_ degree: Int) -> String {

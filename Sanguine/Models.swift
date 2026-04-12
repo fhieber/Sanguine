@@ -162,6 +162,132 @@ struct ReadingStats {
     }
 }
 
+// MARK: - Polynomial Trendline
+
+/// Solves A·x = b via Gaussian elimination with partial pivoting.
+/// Returns nil if any pivot is below 1e-12 (singular or near-singular system).
+private func gaussianElimination(_ A: [[Double]], _ b: [Double]) -> [Double]? {
+    let n = b.count
+    var M = A.enumerated().map { (i, row) -> [Double] in var r = row; r.append(b[i]); return r }
+
+    for col in 0 ..< n {
+        var maxRow = col
+        var maxVal = abs(M[col][col])
+        for row in (col + 1) ..< n {
+            let v = abs(M[row][col])
+            if v > maxVal { maxVal = v; maxRow = row }
+        }
+        guard maxVal > 1e-12 else { return nil }
+        if maxRow != col { M.swapAt(col, maxRow) }
+        let pivot = M[col][col]
+        for row in (col + 1) ..< n {
+            let factor = M[row][col] / pivot
+            for k in col ... n { M[row][k] -= factor * M[col][k] }
+        }
+    }
+
+    var x = [Double](repeating: 0, count: n)
+    for i in stride(from: n - 1, through: 0, by: -1) {
+        var sum = M[i][n]
+        for j in (i + 1) ..< n { sum -= M[i][j] * x[j] }
+        guard abs(M[i][i]) > 1e-12 else { return nil }
+        x[i] = sum / M[i][i]
+    }
+    return x
+}
+
+/// Represents a polynomial fit to (normalizedX, y) pairs.
+/// Coefficients are in ascending power order: `coefficients[i]` is the coefficient of `x^i`.
+struct PolynomialFit {
+    let degree: Int
+    let coefficients: [Double]
+
+    /// Fits a polynomial of `degree` to `normalizedX` ∈ [0,1] and `y` values.
+    /// Returns nil when there are fewer than (degree + 1) points or the system is singular.
+    static func fit(normalizedX xs: [Double], y ys: [Double], degree: Int) -> PolynomialFit? {
+        let n = xs.count
+        guard n >= degree + 1, n == ys.count else { return nil }
+        let k = degree + 1
+
+        var XtX = [[Double]](repeating: [Double](repeating: 0, count: k), count: k)
+        var Xty = [Double](repeating: 0, count: k)
+
+        for i in 0 ..< n {
+            var pw = [Double](repeating: 1, count: k)
+            for j in 1 ..< k { pw[j] = pw[j - 1] * xs[i] }
+            for row in 0 ..< k {
+                Xty[row] += pw[row] * ys[i]
+                for col in 0 ..< k { XtX[row][col] += pw[row] * pw[col] }
+            }
+        }
+
+        guard let coeffs = gaussianElimination(XtX, Xty) else { return nil }
+        return PolynomialFit(degree: degree, coefficients: coeffs)
+    }
+
+    /// Evaluates the polynomial at a normalized x value.
+    func evaluate(at x: Double) -> Double {
+        var result = 0.0
+        var power = 1.0
+        for c in coefficients { result += c * power; power *= x }
+        return result
+    }
+
+    /// BIC = n·ln(RSS/n) + k·ln(n), k = degree + 2. RSS is clamped to 1e-10.
+    func computeBIC(normalizedX xs: [Double], y ys: [Double]) -> Double {
+        let n = Double(xs.count)
+        let k = Double(degree + 2)
+        var rss = 0.0
+        for i in 0 ..< xs.count {
+            let residual = ys[i] - evaluate(at: xs[i])
+            rss += residual * residual
+        }
+        return n * log(max(rss, 1e-10) / n) + k * log(n)
+    }
+}
+
+/// Wraps a `PolynomialFit` with date normalization so it can evaluate at any `Date`.
+struct ReadingTrend {
+    let fit: PolynomialFit
+    /// The earliest reading date (x = 0 in normalized space).
+    let t0: Date
+    /// Total time span in seconds (x = 1 in normalized space).
+    let tScale: TimeInterval
+
+    /// Computes the best-fit polynomial (degrees 1–4) for the given readings using BIC selection.
+    /// Returns nil when readings.count < 3, all readings share the same timestamp, or all fits fail.
+    static func compute(from readings: [Reading]) -> ReadingTrend? {
+        guard readings.count >= 3 else { return nil }
+        let sorted = readings.sorted { $0.recordedAt < $1.recordedAt }
+        let t0 = sorted.first!.recordedAt
+        let tScale = sorted.last!.recordedAt.timeIntervalSince(t0)
+        guard tScale > 0 else { return nil }
+
+        let xs = sorted.map { $0.recordedAt.timeIntervalSince(t0) / tScale }
+        let ys = sorted.map(\.value)
+
+        var bestFit: PolynomialFit? = nil
+        var bestBIC = Double.infinity
+        // Require at least 2× as many points as parameters (degree + 1) to avoid overfitting.
+        // e.g. degree 2 needs 6 points, degree 3 needs 8, degree 4 needs 10.
+        let maxDegree = min(4, (sorted.count - 1) / 2)
+        for degree in 1 ... maxDegree {
+            guard let candidate = PolynomialFit.fit(normalizedX: xs, y: ys, degree: degree) else { continue }
+            let bic = candidate.computeBIC(normalizedX: xs, y: ys)
+            if bic < bestBIC { bestBIC = bic; bestFit = candidate }
+        }
+
+        guard let fit = bestFit else { return nil }
+        return ReadingTrend(fit: fit, t0: t0, tScale: tScale)
+    }
+
+    /// Evaluates the polynomial at the given date.
+    func evaluate(at date: Date) -> Double {
+        let x = date.timeIntervalSince(t0) / tScale
+        return fit.evaluate(at: x)
+    }
+}
+
 struct DoseStats {
     let entries: [DoseEntry]
 

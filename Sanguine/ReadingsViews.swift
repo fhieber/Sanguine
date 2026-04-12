@@ -137,7 +137,7 @@ struct ReadingsTab: View {
 
     private var rangePicker: some View {
         HStack(spacing: 6) {
-            Text("Trend")
+            Text("Range")
             Spacer()
             if let custom = customRange {
                 HStack(spacing: 4) {
@@ -377,14 +377,40 @@ struct AddReadingView: View {
 
 // MARK: - Reading Chart
 
+private struct Line: Shape {
+    func path(in rect: CGRect) -> Path {
+        Path { p in p.move(to: CGPoint(x: rect.minX, y: rect.midY)); p.addLine(to: CGPoint(x: rect.maxX, y: rect.midY)) }
+    }
+}
+
+private struct TrendPoint: Identifiable {
+    let id: Int
+    let date: Date
+    let value: Double
+}
+
 struct ReadingChartView: View {
     let readings: [Reading]
     let lowTarget: Double
     let highTarget: Double
-
     private var sorted: [Reading] { readings.sorted { $0.recordedAt < $1.recordedAt } }
 
+    private var trend: ReadingTrend? {
+        readings.count >= 3 ? ReadingTrend.compute(from: readings) : nil
+    }
+
+    private var trendPoints: [TrendPoint] {
+        guard let trend else { return [] }
+        let steps = max(20, readings.count * 2)
+        return (0 ..< steps).map { i in
+            let fraction = Double(i) / Double(steps - 1)
+            let date = trend.t0.addingTimeInterval(trend.tScale * fraction)
+            return TrendPoint(id: i, date: date, value: trend.evaluate(at: date))
+        }
+    }
+
     var body: some View {
+        VStack(spacing: 8) {
         Chart {
             // Target range band
             if let first = sorted.first, let last = sorted.last {
@@ -426,6 +452,20 @@ struct ReadingChartView: View {
                 .interpolationMethod(.catmullRom)
             }
 
+            // Polynomial trendline
+            if !trendPoints.isEmpty {
+                ForEach(trendPoints) { pt in
+                    LineMark(
+                        x: .value("Date", pt.date),
+                        y: .value("Trend", pt.value),
+                        series: .value("Series", "Trend")
+                    )
+                    .foregroundStyle(Color.orange.opacity(0.85))
+                    .lineStyle(StrokeStyle(lineWidth: 2, dash: [6, 4]))
+                    .interpolationMethod(.linear)
+                }
+            }
+
             // Points
             ForEach(sorted) { r in
                 PointMark(
@@ -445,6 +485,31 @@ struct ReadingChartView: View {
         }
         .chartYAxis {
             AxisMarks(position: .leading)
+        }
+        .chartLegend(.hidden)
+
+        if !trendPoints.isEmpty {
+            HStack(spacing: 12) {
+                HStack(spacing: 4) {
+                    Rectangle().fill(Color.blue.opacity(0.6)).frame(width: 16, height: 2)
+                    Text("Reading").font(.caption2).foregroundStyle(.secondary)
+                }
+                HStack(spacing: 4) {
+                    Line().stroke(Color.orange.opacity(0.85), style: StrokeStyle(lineWidth: 2, dash: [4, 3])).frame(width: 16, height: 2)
+                    Text(trend.map { trendLabel($0.fit.degree) } ?? "Trend").font(.caption2).foregroundStyle(.secondary)
+                }
+                Spacer()
+            }
+        }
+        }
+    }
+
+    private func trendLabel(_ degree: Int) -> String {
+        switch degree {
+        case 1: return "Linear trend"
+        case 2: return "Quadratic trend"
+        case 3: return "Cubic trend"
+        default: return "Quartic trend"
         }
     }
 

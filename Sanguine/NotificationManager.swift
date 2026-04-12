@@ -131,11 +131,13 @@ final class NotificationManager: Sendable {
     func cancelPlannedDoseNotification() {
         let center = UNUserNotificationCenter.current()
         Task {
-            let pending = await center.pendingNotificationRequests()
+            async let pendingReqs = center.pendingNotificationRequests()
+            async let deliveredNotifs = center.deliveredNotifications()
+            let (pending, delivered) = await (pendingReqs, deliveredNotifs)
+
             let pendingIDs = pending.map(\.identifier).filter { $0.hasPrefix(Self.dosePlanIDPrefix) }
             center.removePendingNotificationRequests(withIdentifiers: pendingIDs)
 
-            let delivered = await center.deliveredNotifications()
             let deliveredIDs = delivered.map(\.request.identifier).filter { $0.hasPrefix(Self.dosePlanIDPrefix) }
             center.removeDeliveredNotifications(withIdentifiers: deliveredIDs)
         }

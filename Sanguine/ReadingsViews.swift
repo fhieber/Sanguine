@@ -437,7 +437,7 @@ struct ReadingChartView: View {
 
     private var trendPoints: [TrendPoint] {
         guard let trend else { return [] }
-        let steps = 40
+        let steps = 40 // sufficient for smooth curve on iPhone; revisit for wider displays
         return (0 ..< steps).map { i in
             let fraction = Double(i) / Double(steps - 1)
             let date = trend.t0.addingTimeInterval(trend.tScale * fraction)

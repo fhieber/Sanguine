@@ -81,6 +81,25 @@ struct DoseTab: View {
 
     private var stats: DoseStats { DoseStats(entries: filtered) }
 
+    private var dataRangeLabel: String {
+        let start: Date
+        let end: Date
+        if let wd = chartWindowDuration {
+            start = statsScrollDate
+            end = statsScrollDate.addingTimeInterval(wd)
+        } else {
+            guard let s = historical.map(\.date).min(),
+                  let e = historical.map(\.date).max() else { return "" }
+            start = s; end = e
+        }
+        let cal = Calendar.current
+        if cal.component(.year, from: start) == cal.component(.year, from: end) {
+            return "\(start.formatted(.dateTime.month(.abbreviated).day())) – \(end.formatted(.dateTime.month(.abbreviated).day()))"
+        } else {
+            return "\(start.formatted(.dateTime.month(.abbreviated).year())) – \(end.formatted(.dateTime.month(.abbreviated).year()))"
+        }
+    }
+
     private var historyRows: [DoseEntry] {
         Array(filtered.prefix(visibleCount))
     }
@@ -166,7 +185,7 @@ struct DoseTab: View {
                     }
                 }
 
-                // History
+                // Data
                 Section {
                     if allEntries.isEmpty {
                         ContentUnavailableView(
@@ -193,7 +212,13 @@ struct DoseTab: View {
                     }
                 } header: {
                     HStack {
-                        Text("History")
+                        Text("Data")
+                        if !dataRangeLabel.isEmpty {
+                            Text(dataRangeLabel)
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                                .textCase(nil)
+                        }
                         Spacer()
                         EditButton()
                             .textCase(nil)
@@ -309,22 +334,38 @@ struct DoseChartView: View {
     private var visibleSpan: TimeInterval { visibleEnd.timeIntervalSince(scrollDate) }
 
     var body: some View {
-        Chart {
-            ForEach(sorted) { e in
-                PointMark(
-                    x: .value("Date", e.date),
-                    y: .value("Dose", e.dose)
-                )
-                .foregroundStyle(Color.orange)
-                .symbolSize(50)
+        VStack(spacing: 4) {
+            Chart {
+                ForEach(sorted) { e in
+                    PointMark(
+                        x: .value("Date", e.date),
+                        y: .value("Dose", e.dose)
+                    )
+                    .foregroundStyle(Color.orange)
+                    .symbolSize(50)
+                }
+            }
+            .chartYScale(domain: yDomain)
+            .smartChartXAxis(scrollDate: scrollDate, visibleEnd: visibleEnd, visibleSpan: visibleSpan)
+            .chartYAxis {
+                AxisMarks(position: .leading)
+            }
+            .chartScrollWindow(windowDuration: windowDuration, visibleSpan: visibleSpan, scrollDate: $scrollDate, anchorDate: anchorDate)
+
+            if let wd = windowDuration, anchorDate == nil {
+                HStack {
+                    Spacer()
+                    Button {
+                        scrollDate = Date.now.addingTimeInterval(-wd)
+                    } label: {
+                        Image(systemName: "arrow.right.to.line")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
             }
         }
-        .chartYScale(domain: yDomain)
-        .smartChartXAxis(scrollDate: scrollDate, visibleEnd: visibleEnd, visibleSpan: visibleSpan)
-        .chartYAxis {
-            AxisMarks(position: .leading)
-        }
-        .chartScrollWindow(windowDuration: windowDuration, visibleSpan: visibleSpan, scrollDate: $scrollDate, anchorDate: anchorDate)
     }
 
     private var yDomain: ClosedRange<Double> {

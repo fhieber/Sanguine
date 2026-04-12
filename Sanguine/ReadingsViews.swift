@@ -78,6 +78,25 @@ struct ReadingsTab: View {
 
     private var stats: ReadingStats { ReadingStats(readings: filtered, lowTarget: lowTarget, highTarget: highTarget) }
 
+    private var dataRangeLabel: String {
+        let start: Date
+        let end: Date
+        if let wd = chartWindowDuration {
+            start = statsScrollDate
+            end = statsScrollDate.addingTimeInterval(wd)
+        } else {
+            guard let s = readings.map(\.recordedAt).min(),
+                  let e = readings.map(\.recordedAt).max() else { return "" }
+            start = s; end = e
+        }
+        let cal = Calendar.current
+        if cal.component(.year, from: start) == cal.component(.year, from: end) {
+            return "\(start.formatted(.dateTime.month(.abbreviated).day())) – \(end.formatted(.dateTime.month(.abbreviated).day()))"
+        } else {
+            return "\(start.formatted(.dateTime.month(.abbreviated).year())) – \(end.formatted(.dateTime.month(.abbreviated).year()))"
+        }
+    }
+
     private var historyRows: [Reading] {
         Array(filtered.prefix(visibleCount))
     }
@@ -137,7 +156,13 @@ struct ReadingsTab: View {
                     }
                 } header: {
                     HStack {
-                        Text("History")
+                        Text("Data")
+                        if !dataRangeLabel.isEmpty {
+                            Text(dataRangeLabel)
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                                .textCase(nil)
+                        }
                         Spacer()
                         EditButton()
                             .textCase(nil)
@@ -165,7 +190,6 @@ struct ReadingsTab: View {
                 DateRangePickerSheet(customRange: $customRange)
             }
             .onChange(of: chartScrollDate) { _, new in
-                if showTrend { showTrend = false }
                 debounceTask?.cancel()
                 debounceTask = Task { @MainActor in
                     try? await Task.sleep(for: .milliseconds(300))
@@ -174,7 +198,7 @@ struct ReadingsTab: View {
                 }
             }
             .onChange(of: statsScrollDate) { _, _ in
-                if showTrend { recomputeTrend() }
+                if showTrend { showTrend = false }
             }
             .onChange(of: showTrend) { _, on in
                 if on { recomputeTrend() } else { trendPoints = []; trendDegree = nil }
@@ -517,7 +541,17 @@ struct ReadingChartView: View {
                 .interpolationMethod(.catmullRom)
             }
 
-            // Polynomial trendline
+            // Points
+            ForEach(sorted) { r in
+                PointMark(
+                    x: .value("Date", r.recordedAt),
+                    y: .value("Reading", r.value)
+                )
+                .foregroundStyle(r.value >= lowTarget && r.value <= highTarget ? Color.green : Color.red)
+                .symbolSize(40)
+            }
+
+            // Polynomial trendline — drawn last so it appears on top
             if !trendPoints.isEmpty {
                 ForEach(trendPoints) { pt in
                     LineMark(
@@ -529,16 +563,6 @@ struct ReadingChartView: View {
                     .lineStyle(StrokeStyle(lineWidth: 2, dash: [6, 4]))
                     .interpolationMethod(.linear)
                 }
-            }
-
-            // Points
-            ForEach(sorted) { r in
-                PointMark(
-                    x: .value("Date", r.recordedAt),
-                    y: .value("Reading", r.value)
-                )
-                .foregroundStyle(r.value >= lowTarget && r.value <= highTarget ? Color.green : Color.red)
-                .symbolSize(40)
             }
         }
         .chartYScale(domain: yDomain)

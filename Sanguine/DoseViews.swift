@@ -236,7 +236,7 @@ struct DoseTab: View {
 
     private var rangePicker: some View {
         HStack(spacing: 6) {
-            Text("Trend")
+            Text("Range")
             Spacer()
             if let custom = customRange {
                 HStack(spacing: 4) {

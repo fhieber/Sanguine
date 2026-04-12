@@ -268,7 +268,9 @@ struct ReadingTrend {
 
         var bestFit: PolynomialFit? = nil
         var bestBIC = Double.infinity
-        let maxDegree = min(4, sorted.count - 1)
+        // Require at least 2× as many points as parameters (degree + 1) to avoid overfitting.
+        // e.g. degree 2 needs 6 points, degree 3 needs 8, degree 4 needs 10.
+        let maxDegree = min(4, (sorted.count - 1) / 2)
         for degree in 1 ... maxDegree {
             guard let candidate = PolynomialFit.fit(normalizedX: xs, y: ys, degree: degree) else { continue }
             let bic = candidate.computeBIC(normalizedX: xs, y: ys)

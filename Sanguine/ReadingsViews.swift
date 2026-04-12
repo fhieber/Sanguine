@@ -190,7 +190,6 @@ struct ReadingsTab: View {
                 DateRangePickerSheet(customRange: $customRange)
             }
             .onChange(of: chartScrollDate) { _, new in
-                if showTrend { showTrend = false }
                 debounceTask?.cancel()
                 debounceTask = Task { @MainActor in
                     try? await Task.sleep(for: .milliseconds(300))
@@ -199,7 +198,7 @@ struct ReadingsTab: View {
                 }
             }
             .onChange(of: statsScrollDate) { _, _ in
-                if showTrend { recomputeTrend() }
+                if showTrend { showTrend = false }
             }
             .onChange(of: showTrend) { _, on in
                 if on { recomputeTrend() } else { trendPoints = []; trendDegree = nil }

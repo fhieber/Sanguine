@@ -49,15 +49,20 @@ struct ReadingsTab: View {
     @State private var selectedRange: StatsRange = .last6Months
     @State private var customRange: (start: Date, end: Date)? = nil
     @State private var showingCustomPicker = false
+    @State private var chartScrollDate: Date = .now
     @AppStorage("readingLowTarget", store: .appGroup) private var lowTarget: Double = 2.0
     @AppStorage("readingHighTarget", store: .appGroup) private var highTarget: Double = 3.0
 
+    private var chartWindowDuration: TimeInterval? {
+        customRange.map { $0.end.timeIntervalSince($0.start) } ?? selectedRange.windowDuration
+    }
+
     private var filtered: [Reading] {
-        if let custom = customRange {
-            return readings.filter { $0.recordedAt >= custom.start && $0.recordedAt <= custom.end }
+        if let wd = chartWindowDuration {
+            let end = chartScrollDate.addingTimeInterval(wd)
+            return readings.filter { $0.recordedAt >= chartScrollDate && $0.recordedAt <= end }
         }
-        guard let cutoff = selectedRange.cutoff() else { return readings }
-        return readings.filter { $0.recordedAt >= cutoff }
+        return Array(readings)
     }
 
     private var stats: ReadingStats { ReadingStats(readings: filtered, lowTarget: lowTarget, highTarget: highTarget) }
@@ -75,8 +80,9 @@ struct ReadingsTab: View {
                             readings: Array(readings),
                             lowTarget: lowTarget,
                             highTarget: highTarget,
-                            windowDuration: customRange.map { $0.end.timeIntervalSince($0.start) } ?? selectedRange.windowDuration,
-                            anchorDate: customRange?.start
+                            windowDuration: chartWindowDuration,
+                            anchorDate: customRange?.start,
+                            scrollDate: $chartScrollDate
                         )
                         .frame(height: 220)
                         .listRowInsets(EdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8))
@@ -409,9 +415,8 @@ struct ReadingChartView: View {
     let windowDuration: TimeInterval?
     /// When set, the chart jumps to this date instead of keeping the current center.
     var anchorDate: Date? = nil
-
-    /// Leading edge of the visible window. Initialized to show the most recent data.
-    @State private var scrollDate: Date = .now
+    /// Bound to parent so stats update as the user pans.
+    @Binding var scrollDate: Date
 
     private var sorted: [Reading] { readings.sorted { $0.recordedAt < $1.recordedAt } }
 
@@ -513,14 +518,33 @@ struct ReadingChartView: View {
         }
         .chartYScale(domain: yDomain)
         .chartXAxis {
-            if Calendar.current.component(.year, from: scrollDate) !=
-               Calendar.current.component(.year, from: visibleEnd) {
+            let days = visibleSpan / 86400
+            let spansYears = Calendar.current.component(.year, from: scrollDate) !=
+                             Calendar.current.component(.year, from: visibleEnd)
+            if spansYears {
                 AxisMarks(values: .stride(by: .month)) { value in
                     AxisGridLine()
                     AxisValueLabel {
                         if let date = value.as(Date.self) {
-                            Text(date.formatted(.dateTime.month(.abbreviated).year()))
-                                .font(.caption2)
+                            Text(date.formatted(.dateTime.month(.abbreviated).year())).font(.caption2)
+                        }
+                    }
+                }
+            } else if days > 60 {
+                AxisMarks(values: .stride(by: .month)) { value in
+                    AxisGridLine()
+                    AxisValueLabel {
+                        if let date = value.as(Date.self) {
+                            Text(date.formatted(.dateTime.month(.abbreviated))).font(.caption2)
+                        }
+                    }
+                }
+            } else if days > 7 {
+                AxisMarks(values: .stride(by: .weekOfYear)) { value in
+                    AxisGridLine()
+                    AxisValueLabel {
+                        if let date = value.as(Date.self) {
+                            Text(date.formatted(.dateTime.month(.abbreviated).day())).font(.caption2)
                         }
                     }
                 }
@@ -529,8 +553,7 @@ struct ReadingChartView: View {
                     AxisGridLine()
                     AxisValueLabel {
                         if let date = value.as(Date.self) {
-                            Text(date.formatted(.dateTime.month(.abbreviated).day()))
-                                .font(.caption2)
+                            Text(date.formatted(.dateTime.month(.abbreviated).day())).font(.caption2)
                         }
                     }
                 }

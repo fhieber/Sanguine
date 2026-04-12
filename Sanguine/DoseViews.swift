@@ -46,6 +46,11 @@ struct DoseTab: View {
     @State private var visibleCount = 5
     @State private var showingAdd = false
     @State private var deepLinkEntry: DoseEntry? = nil
+    @State private var chartScrollDate: Date = .now
+
+    private var chartWindowDuration: TimeInterval? {
+        customRange.map { $0.end.timeIntervalSince($0.start) } ?? selectedRange.windowDuration
+    }
 
     private var plannedTimeLabel: String {
         doseTimeLabel(hour: doseHour, minute: doseMinute, timezoneID: doseTimezoneID)
@@ -69,11 +74,11 @@ struct DoseTab: View {
     }
 
     private var filtered: [DoseEntry] {
-        if let custom = customRange {
-            return historical.filter { $0.date >= custom.start && $0.date <= custom.end }
+        if let wd = chartWindowDuration {
+            let end = chartScrollDate.addingTimeInterval(wd)
+            return historical.filter { $0.date >= chartScrollDate && $0.date <= end }
         }
-        guard let cutoff = selectedRange.cutoff() else { return historical }
-        return historical.filter { $0.date >= cutoff }
+        return historical
     }
 
     private var stats: DoseStats { DoseStats(entries: filtered) }
@@ -144,8 +149,9 @@ struct DoseTab: View {
                     Section {
                         DoseChartView(
                             entries: historical,
-                            windowDuration: customRange.map { $0.end.timeIntervalSince($0.start) } ?? selectedRange.windowDuration,
-                            anchorDate: customRange?.start
+                            windowDuration: chartWindowDuration,
+                            anchorDate: customRange?.start,
+                            scrollDate: $chartScrollDate
                         )
                         .frame(height: 220)
                         .listRowInsets(EdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8))
@@ -284,8 +290,7 @@ struct DoseChartView: View {
     let entries: [DoseEntry]
     let windowDuration: TimeInterval?
     var anchorDate: Date? = nil
-
-    @State private var scrollDate: Date = .now
+    @Binding var scrollDate: Date
 
     private var sorted: [DoseEntry] { entries.sorted { $0.date < $1.date } }
     private var dataStart: Date { sorted.first?.date ?? .now }
@@ -310,14 +315,33 @@ struct DoseChartView: View {
         }
         .chartYScale(domain: yDomain)
         .chartXAxis {
-            if Calendar.current.component(.year, from: scrollDate) !=
-               Calendar.current.component(.year, from: visibleEnd) {
+            let days = visibleSpan / 86400
+            let spansYears = Calendar.current.component(.year, from: scrollDate) !=
+                             Calendar.current.component(.year, from: visibleEnd)
+            if spansYears {
                 AxisMarks(values: .stride(by: .month)) { value in
                     AxisGridLine()
                     AxisValueLabel {
                         if let date = value.as(Date.self) {
-                            Text(date.formatted(.dateTime.month(.abbreviated).year()))
-                                .font(.caption2)
+                            Text(date.formatted(.dateTime.month(.abbreviated).year())).font(.caption2)
+                        }
+                    }
+                }
+            } else if days > 60 {
+                AxisMarks(values: .stride(by: .month)) { value in
+                    AxisGridLine()
+                    AxisValueLabel {
+                        if let date = value.as(Date.self) {
+                            Text(date.formatted(.dateTime.month(.abbreviated))).font(.caption2)
+                        }
+                    }
+                }
+            } else if days > 7 {
+                AxisMarks(values: .stride(by: .weekOfYear)) { value in
+                    AxisGridLine()
+                    AxisValueLabel {
+                        if let date = value.as(Date.self) {
+                            Text(date.formatted(.dateTime.month(.abbreviated).day())).font(.caption2)
                         }
                     }
                 }
@@ -326,8 +350,7 @@ struct DoseChartView: View {
                     AxisGridLine()
                     AxisValueLabel {
                         if let date = value.as(Date.self) {
-                            Text(date.formatted(.dateTime.month(.abbreviated).day()))
-                                .font(.caption2)
+                            Text(date.formatted(.dateTime.month(.abbreviated).day())).font(.caption2)
                         }
                     }
                 }

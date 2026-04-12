@@ -198,7 +198,7 @@ struct ReadingsTab: View {
                 }
             }
             .onChange(of: statsScrollDate) { _, _ in
-                if showTrend { showTrend = false }
+                if showTrend { recomputeTrend() }
             }
             .onChange(of: showTrend) { _, on in
                 if on { recomputeTrend() } else { trendPoints = []; trendDegree = nil }

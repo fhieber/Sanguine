@@ -44,14 +44,12 @@ struct ReadingsTab: View {
     @State private var selectedRange: StatsRange = .last6Months
     @State private var customRange: (start: Date, end: Date)? = nil
     @State private var showingCustomPicker = false
-    @State private var chartScrollDate: Date = .now
-    /// Debounced copy of chartScrollDate — updated ~300ms after panning stops.
+    /// Updated ~300ms after panning stops via ReadingChartView.onScrollSettled.
     /// All stats, history, and trend computation use this to avoid re-rendering on every scroll frame.
     @State private var statsScrollDate: Date = .now
     @State private var showTrend = false
     @State private var trendPoints: [TrendPoint] = []
     @State private var trendDegree: Int? = nil
-    @State private var debounceTask: Task<Void, Never>? = nil
     @AppStorage("readingLowTarget", store: .appGroup) private var lowTarget: Double = 2.0
     @AppStorage("readingHighTarget", store: .appGroup) private var highTarget: Double = 3.0
 
@@ -112,10 +110,10 @@ struct ReadingsTab: View {
                             highTarget: highTarget,
                             windowDuration: chartWindowDuration,
                             anchorDate: chartAnchorDate,
-                            scrollDate: $chartScrollDate,
                             trendPoints: trendPoints,
                             trendDegree: trendDegree,
-                            showTrend: $showTrend
+                            showTrend: $showTrend,
+                            onScrollSettled: { date in statsScrollDate = date }
                         )
                         .frame(height: 220)
                         .listRowInsets(EdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8))
@@ -188,14 +186,6 @@ struct ReadingsTab: View {
             }
             .sheet(isPresented: $showingCustomPicker) {
                 DateRangePickerSheet(customRange: $customRange)
-            }
-            .onChange(of: chartScrollDate) { _, new in
-                debounceTask?.cancel()
-                debounceTask = Task { @MainActor in
-                    try? await Task.sleep(for: .milliseconds(300))
-                    guard !Task.isCancelled else { return }
-                    statsScrollDate = new
-                }
             }
             .onChange(of: statsScrollDate) { _, _ in
                 if showTrend { recomputeTrend() }
@@ -477,26 +467,30 @@ struct ReadingChartView: View {
     let readings: [Reading]
     let lowTarget: Double
     let highTarget: Double
-    /// Fixed window size in seconds. nil = show all data without scrolling.
     let windowDuration: TimeInterval?
-    /// When set, the chart jumps to this date instead of keeping the current center.
     var anchorDate: Date? = nil
-    /// Bound to parent so stats update as the user pans.
-    @Binding var scrollDate: Date
     /// Precomputed by parent using debounced scroll position — empty when trend is hidden.
     let trendPoints: [TrendPoint]
     let trendDegree: Int?
     @Binding var showTrend: Bool
+    /// Called once panning settles (~300ms after the user lifts their finger).
+    var onScrollSettled: (Date) -> Void = { _ in }
+
+    @State private var scrollDate: Date = .now
+    /// Debounced copy of scrollDate — drives axis labels and the jump-to-now button
+    /// so neither redraws on every scroll frame.
+    @State private var axisDate: Date = .now
+    @State private var debounceTask: Task<Void, Never>? = nil
 
     private var sorted: [Reading] { readings.sorted { $0.recordedAt < $1.recordedAt } }
 
     private var dataStart: Date { readings.min(by: { $0.recordedAt < $1.recordedAt })?.recordedAt ?? .now }
     private var dataEnd: Date   { readings.max(by: { $0.recordedAt < $1.recordedAt })?.recordedAt ?? .now }
 
-    private var visibleStart: Date { windowDuration != nil ? scrollDate : dataStart }
+    private var visibleStart: Date { windowDuration != nil ? axisDate : dataStart }
     private var visibleEnd: Date {
         guard let windowDuration else { return dataEnd }
-        return scrollDate.addingTimeInterval(windowDuration)
+        return axisDate.addingTimeInterval(windowDuration)
     }
 
     private var visibleSpan: TimeInterval { visibleEnd.timeIntervalSince(visibleStart) }
@@ -573,6 +567,19 @@ struct ReadingChartView: View {
         }
         .chartLegend(.hidden)
         .chartScrollWindow(windowDuration: windowDuration, visibleSpan: visibleSpan, scrollDate: $scrollDate, anchorDate: anchorDate)
+        .onChange(of: scrollDate) { _, new in
+            debounceTask?.cancel()
+            debounceTask = Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(300))
+                guard !Task.isCancelled else { return }
+                axisDate = new
+                onScrollSettled(new)
+            }
+        }
+        .onChange(of: anchorDate) { _, new in
+            // Snap axis labels immediately when the user switches range
+            if let new { axisDate = new }
+        }
 
         HStack {
             HStack(spacing: 4) {
@@ -595,7 +602,9 @@ struct ReadingChartView: View {
             .buttonStyle(.plain)
             if let wd = windowDuration, anchorDate == nil {
                 Button {
-                    scrollDate = Date.now.addingTimeInterval(-wd)
+                    let target = Date.now.addingTimeInterval(-wd)
+                    scrollDate = target
+                    axisDate = target
                 } label: {
                     Image(systemName: "arrow.right.to.line")
                         .font(.caption2)

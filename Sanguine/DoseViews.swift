@@ -42,9 +42,7 @@ struct DoseTab: View {
     @State private var visibleCount = 5
     @State private var showingAdd = false
     @State private var deepLinkEntry: DoseEntry? = nil
-    @State private var chartScrollDate: Date = .now
     @State private var statsScrollDate: Date = .now
-    @State private var debounceTask: Task<Void, Never>? = nil
 
     private var chartWindowDuration: TimeInterval? {
         customRange.map { $0.end.timeIntervalSince($0.start) } ?? selectedRange.windowDuration
@@ -168,7 +166,7 @@ struct DoseTab: View {
                             entries: historical,
                             windowDuration: chartWindowDuration,
                             anchorDate: customRange?.start,
-                            scrollDate: $chartScrollDate
+                            onScrollSettled: { date in statsScrollDate = date }
                         )
                         .frame(height: 220)
                         .listRowInsets(EdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8))
@@ -245,14 +243,6 @@ struct DoseTab: View {
             }
             .task { scheduleDoseNotifications() }
             .onChange(of: allEntries) { scheduleDoseNotifications() }
-            .onChange(of: chartScrollDate) { _, new in
-                debounceTask?.cancel()
-                debounceTask = Task { @MainActor in
-                    try? await Task.sleep(for: .milliseconds(300))
-                    guard !Task.isCancelled else { return }
-                    statsScrollDate = new
-                }
-            }
         }
     }
 
@@ -321,16 +311,20 @@ struct DoseChartView: View {
     let entries: [DoseEntry]
     let windowDuration: TimeInterval?
     var anchorDate: Date? = nil
-    @Binding var scrollDate: Date
+    var onScrollSettled: (Date) -> Void = { _ in }
+
+    @State private var scrollDate: Date = .now
+    @State private var axisDate: Date = .now
+    @State private var debounceTask: Task<Void, Never>? = nil
 
     private var sorted: [DoseEntry] { entries.sorted { $0.date < $1.date } }
     private var dataStart: Date { entries.min(by: { $0.date < $1.date })?.date ?? .now }
     private var dataEnd: Date   { entries.max(by: { $0.date < $1.date })?.date ?? .now }
 
-    private var visibleStart: Date { windowDuration != nil ? scrollDate : dataStart }
+    private var visibleStart: Date { windowDuration != nil ? axisDate : dataStart }
     private var visibleEnd: Date {
         guard let windowDuration else { return dataEnd }
-        return scrollDate.addingTimeInterval(windowDuration)
+        return axisDate.addingTimeInterval(windowDuration)
     }
     private var visibleSpan: TimeInterval { visibleEnd.timeIntervalSince(visibleStart) }
 
@@ -352,12 +346,26 @@ struct DoseChartView: View {
                 AxisMarks(position: .leading)
             }
             .chartScrollWindow(windowDuration: windowDuration, visibleSpan: visibleSpan, scrollDate: $scrollDate, anchorDate: anchorDate)
+            .onChange(of: scrollDate) { _, new in
+                debounceTask?.cancel()
+                debounceTask = Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(300))
+                    guard !Task.isCancelled else { return }
+                    axisDate = new
+                    onScrollSettled(new)
+                }
+            }
+            .onChange(of: anchorDate) { _, new in
+                if let new { axisDate = new }
+            }
 
             if let wd = windowDuration, anchorDate == nil {
                 HStack {
                     Spacer()
                     Button {
-                        scrollDate = Date.now.addingTimeInterval(-wd)
+                        let target = Date.now.addingTimeInterval(-wd)
+                        scrollDate = target
+                        axisDate = target
                     } label: {
                         Image(systemName: "arrow.right.to.line")
                             .font(.caption2)

@@ -153,7 +153,7 @@ struct SanguineWidgetEntryView: View {
                     let showReadingCalendar = entry.isReadingReminderToday && !readingTakenToday
                     Image(systemName: showReadingCalendar ? "calendar.circle.fill" :
                           (staleReading ? "exclamationmark.circle.fill" : "checkmark.circle.fill"))
-                        .foregroundStyle(showReadingCalendar ? .primary :
+                        .foregroundStyle(showReadingCalendar ? Color.primary :
                           (staleReading || entry.readingInRange == false ? .red : .green))
                         .font(isSmall ? .body : .title2)
                     VStack(alignment: .leading, spacing: 1) {

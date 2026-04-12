@@ -570,6 +570,16 @@ struct ReadingChartView: View {
                     .foregroundStyle(showTrend ? .orange : .secondary)
             }
             .buttonStyle(.plain)
+            if let wd = windowDuration, anchorDate == nil {
+                Button {
+                    scrollDate = Date.now.addingTimeInterval(-wd)
+                } label: {
+                    Image(systemName: "arrow.right.to.line")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
         }
         }
     }

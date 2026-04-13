@@ -29,6 +29,9 @@ struct SettingsView: View {
     @State private var showingDemoConfirm = false
     @State private var exportFile: ExportFile? = nil
 
+    @State private var lowTargetText: String = ""
+    @State private var highTargetText: String = ""
+
     @FocusState private var isTargetFocused: Bool
 
     var body: some View {
@@ -39,23 +42,37 @@ struct SettingsView: View {
                     HStack {
                         Text("Low Target")
                         Spacer()
-                        TextField("Low", value: $lowTarget, format: .number.precision(.fractionLength(1)))
+                        TextField("Low", text: $lowTargetText)
                             .keyboardType(.decimalPad)
                             .multilineTextAlignment(.trailing)
                             .frame(width: 70)
                             .focused($isTargetFocused)
+                            .onChange(of: lowTargetText) {
+                                if let v = Double(lowTargetText.replacingOccurrences(of: ",", with: ".")) {
+                                    lowTarget = v
+                                }
+                            }
                     }
                     HStack {
                         Text("High Target")
                         Spacer()
-                        TextField("High", value: $highTarget, format: .number.precision(.fractionLength(1)))
+                        TextField("High", text: $highTargetText)
                             .keyboardType(.decimalPad)
                             .multilineTextAlignment(.trailing)
                             .frame(width: 70)
                             .focused($isTargetFocused)
+                            .onChange(of: highTargetText) {
+                                if let v = Double(highTargetText.replacingOccurrences(of: ",", with: ".")) {
+                                    highTarget = v
+                                }
+                            }
                     }
                 } header: {
                     Text("Target Range")
+                }
+                .onAppear {
+                    lowTargetText  = String(format: "%.1f", lowTarget)
+                    highTargetText = String(format: "%.1f", highTarget)
                 }
 
                 // 2) Dose Time

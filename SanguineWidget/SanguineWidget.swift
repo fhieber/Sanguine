@@ -156,7 +156,7 @@ struct SanguineWidgetEntryView: View {
         VStack(spacing: 0) {
             // Row 1: Latest reading — taps to add new reading
             Link(destination: URL(string: "sanguine://add-reading")!) {
-                HStack(spacing: 6) {
+                HStack(spacing: 4) {
                     let staleReading = (daysSinceReading ?? 0) > 7
                     let readingTakenToday = entry.readingDate.map { Calendar.current.isDateInToday($0) } ?? false
                     let showReadingCalendar = entry.isReadingReminderToday && !readingTakenToday
@@ -185,7 +185,7 @@ struct SanguineWidgetEntryView: View {
 
             // Row 2: Today's dose — taps to open dose detail
             Link(destination: URL(string: "sanguine://dose-detail")!) {
-                HStack(spacing: 6) {
+                HStack(spacing: 4) {
                     Image(systemName: entry.todayDoseTaken ? "checkmark.circle.fill" : (entry.todayDose != nil ? "calendar.badge.checkmark" : "exclamationmark.circle.fill"))
                         .foregroundStyle(entry.todayDoseTaken ? .green : (entry.todayDose != nil ? .primary : .red))
                         .font(isSmall ? .body : .title2)
@@ -205,7 +205,7 @@ struct SanguineWidgetEntryView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .padding(isSmall ? 8 : 10)
+        .padding(isSmall ? 6 : 8)
     }
 
 }

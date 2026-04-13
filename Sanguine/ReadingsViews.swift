@@ -10,16 +10,18 @@ enum StatsRange: String, CaseIterable, ChartRange {
     case last3Months = "3M"
     case last6Months = "6M"
     case lastYear    = "1Y"
+    case last2Years  = "2Y"
     case yearToDate  = "YTD"
     case allTime     = "All"
 
     func cutoff() -> Date? {
         let cal = Calendar.current
         switch self {
-        case .lastMonth:   return cal.date(byAdding: .month, value: -1, to: .now)
-        case .last3Months: return cal.date(byAdding: .month, value: -3, to: .now)
-        case .last6Months: return cal.date(byAdding: .month, value: -6, to: .now)
-        case .lastYear:    return cal.date(byAdding: .year,  value: -1, to: .now)
+        case .lastMonth:   return cal.date(byAdding: .month, value: -1,  to: .now)
+        case .last3Months: return cal.date(byAdding: .month, value: -3,  to: .now)
+        case .last6Months: return cal.date(byAdding: .month, value: -6,  to: .now)
+        case .lastYear:    return cal.date(byAdding: .year,  value: -1,  to: .now)
+        case .last2Years:  return cal.date(byAdding: .year,  value: -2,  to: .now)
         case .yearToDate:  return cal.startOfYear(for: .now)
         case .allTime:     return nil
         }
@@ -231,7 +233,7 @@ struct ReadingsTab: View {
                     }
                 }
                 .pickerStyle(.segmented)
-                .frame(maxWidth: 240)
+                .frame(maxWidth: 280)
                 .textCase(nil)
                 .onChange(of: selectedRange) { visibleCount = 5 }
             }

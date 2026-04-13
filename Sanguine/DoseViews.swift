@@ -6,11 +6,13 @@ import WidgetKit
 // MARK: - Dose Range
 
 enum DoseRange: String, CaseIterable, ChartRange {
-    case last7Days  = "7D"
-    case last2Weeks = "2W"
-    case lastMonth  = "1M"
+    case last7Days   = "7D"
+    case last2Weeks  = "2W"
+    case lastMonth   = "1M"
     case last3Months = "3M"
-    case allTime    = "All"
+    case last6Months = "6M"
+    case lastYear    = "1Y"
+    case allTime     = "All"
 
     func cutoff() -> Date? {
         let cal = Calendar.current
@@ -19,6 +21,8 @@ enum DoseRange: String, CaseIterable, ChartRange {
         case .last2Weeks:  return cal.date(byAdding: .day,   value: -14, to: .now)
         case .lastMonth:   return cal.date(byAdding: .month, value: -1,  to: .now)
         case .last3Months: return cal.date(byAdding: .month, value: -3,  to: .now)
+        case .last6Months: return cal.date(byAdding: .month, value: -6,  to: .now)
+        case .lastYear:    return cal.date(byAdding: .year,  value: -1,  to: .now)
         case .allTime:     return nil
         }
     }
@@ -292,7 +296,7 @@ struct DoseTab: View {
                     }
                 }
                 .pickerStyle(.segmented)
-                .frame(maxWidth: 220)
+                .frame(maxWidth: 280)
                 .textCase(nil)
                 .onChange(of: selectedRange) { visibleCount = 5 }
             }

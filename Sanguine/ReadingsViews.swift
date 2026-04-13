@@ -495,8 +495,9 @@ struct ReadingChartView: View {
 
     private var visibleSpan: TimeInterval { visibleEnd.timeIntervalSince(visibleStart) }
 
-    var body: some View {
-        VStack(spacing: 8) {
+    // Extracted to its own property so the compiler can type-check body and chart
+    // independently — the combined expression was too large for the type checker.
+    private var chartView: some View {
         Chart {
             // Target range band
             RectangleMark(
@@ -583,6 +584,11 @@ struct ReadingChartView: View {
             // Snap axis labels immediately when the user switches range
             if let new { axisDate = new }
         }
+    }
+
+    var body: some View {
+        VStack(spacing: 8) {
+        chartView
 
         HStack {
             HStack(spacing: 4) {

@@ -586,20 +586,23 @@ struct ReadingChartView: View {
                 Rectangle().fill(Color.blue.opacity(0.6)).frame(width: 16, height: 2)
                 Text("Reading").font(.caption2).foregroundStyle(.secondary)
             }
-            HStack(spacing: 4) {
-                Line().stroke(Color.orange.opacity(0.85), style: StrokeStyle(lineWidth: 2, dash: [4, 3])).frame(width: 16, height: 2)
-                Text(trendDegree.map { trendLabel($0) } ?? "Trend").font(.caption2).foregroundStyle(.secondary)
-            }
-            Spacer()
             Button {
                 showTrend.toggle()
             } label: {
-                Label(showTrend ? "Hide Trend" : "Trend",
-                      systemImage: showTrend ? "chart.line.uptrend.xyaxis.circle.fill" : "chart.line.uptrend.xyaxis.circle")
-                    .font(.caption2)
-                    .foregroundStyle(showTrend ? .orange : .secondary)
+                HStack(spacing: 4) {
+                    Line()
+                        .stroke(showTrend ? Color.orange.opacity(0.85) : Color.secondary.opacity(0.5),
+                                style: StrokeStyle(lineWidth: 2, dash: [4, 3]))
+                        .frame(width: 16, height: 2)
+                    Text(trendDegree.map { trendLabel($0) } ?? "Trend")
+                        .font(.caption2)
+                    Image(systemName: showTrend ? "chart.line.uptrend.xyaxis.circle.fill" : "chart.line.uptrend.xyaxis.circle")
+                        .font(.caption2)
+                }
+                .foregroundStyle(showTrend ? .orange : .secondary)
             }
             .buttonStyle(.plain)
+            Spacer()
             if let wd = windowDuration, anchorDate == nil {
                 Button {
                     let target = Date.now.addingTimeInterval(-wd)

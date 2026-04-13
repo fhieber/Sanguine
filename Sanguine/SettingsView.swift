@@ -213,7 +213,7 @@ struct SettingsView: View {
 
                 // 5) Version
                 Section("About") {
-                    LabeledContent("Version", value: "1.2")
+                    LabeledContent("Version", value: "1.3")
                     LabeledContent("Data", value: "Stored on device only")
                 }
             }

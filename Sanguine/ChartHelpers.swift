@@ -11,7 +11,12 @@ protocol ChartRange {
 extension ChartRange {
     var windowDuration: TimeInterval? {
         guard let cutoff = cutoff() else { return nil }
-        return Date.now.timeIntervalSince(cutoff)
+        let raw = Date.now.timeIntervalSince(cutoff)
+        // Round to the nearest day so that sub-second drift in Date.now doesn't produce
+        // a different Double on every render frame. Without this, onChange(of: windowDuration)
+        // in chartScrollWindow fires every frame during panning and re-sets scrollDate,
+        // causing jitter.
+        return (raw / 86400).rounded() * 86400
     }
 }
 

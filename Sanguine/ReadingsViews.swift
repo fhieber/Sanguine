@@ -511,20 +511,10 @@ struct ReadingChartView: View {
             RuleMark(y: .value("Low", lowTarget))
                 .foregroundStyle(Color.green.opacity(0.5))
                 .lineStyle(StrokeStyle(lineWidth: 1, dash: [5, 4]))
-                .annotation(position: .trailing, alignment: .leading) {
-                    Text(String(format: "%.1f", lowTarget))
-                        .font(.system(size: 10))
-                        .foregroundStyle(.green)
-                }
 
             RuleMark(y: .value("High", highTarget))
                 .foregroundStyle(Color.green.opacity(0.5))
                 .lineStyle(StrokeStyle(lineWidth: 1, dash: [5, 4]))
-                .annotation(position: .trailing, alignment: .leading) {
-                    Text(String(format: "%.1f", highTarget))
-                        .font(.system(size: 10))
-                        .foregroundStyle(.green)
-                }
 
             // Line
             ForEach(sorted) { r in
@@ -564,6 +554,19 @@ struct ReadingChartView: View {
         .smartChartXAxis(visibleStart: visibleStart, visibleEnd: visibleEnd, visibleSpan: visibleSpan)
         .chartYAxis {
             AxisMarks(position: .leading)
+            // Target range labels pinned to the trailing axis — always visible
+            // regardless of scroll position (unlike .annotation(position: .trailing)
+            // on a RuleMark, which is placed at the data domain's trailing edge and
+            // scrolls off-screen when the user pans left).
+            AxisMarks(values: [lowTarget, highTarget], position: .trailing) { value in
+                AxisValueLabel(anchor: .leading) {
+                    if let v = value.as(Double.self) {
+                        Text(String(format: "%.1f", v))
+                            .font(.system(size: 10))
+                            .foregroundStyle(.green)
+                    }
+                }
+            }
         }
         .chartLegend(.hidden)
         .chartScrollWindow(windowDuration: windowDuration, visibleSpan: visibleSpan, scrollDate: $scrollDate, anchorDate: anchorDate)

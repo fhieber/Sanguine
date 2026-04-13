@@ -229,9 +229,6 @@ struct SettingsView: View {
                 } message: {
                     Text("This will delete all existing data and replace it with generated sample data.")
                 }
-                .sheet(item: $exportFile) { file in
-                    ActivityView(url: file.url)
-                }
 
                 // 5) Version
                 Section("About") {
@@ -246,6 +243,9 @@ struct SettingsView: View {
                 }
             }
             .navigationTitle("Settings")
+            .sheet(item: $exportFile) { file in
+                ActivityView(url: file.url)
+            }
         }
     }
 

@@ -193,7 +193,7 @@ struct DoseTab: View {
                         ContentUnavailableView(
                             "No Dose Data",
                             systemImage: "calendar.badge.checkmark",
-                            description: Text("Import a CSV file in Settings to load dose history.")
+                            description: Text("Tap + to plan doses, or import a CSV file in Settings.")
                         )
                     } else {
                         ForEach(historyRows) { entry in
@@ -489,6 +489,7 @@ struct DoseDetailView: View {
                         entry.isPlanned = false
                         entry.date = .now
                         try? modelContext.save()
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                         NotificationManager.shared.cancelPlannedDoseNotification()
                         WidgetCenter.shared.reloadAllTimelines()
                         dismiss()

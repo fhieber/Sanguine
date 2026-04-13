@@ -23,7 +23,13 @@ struct CSVImporter {
         var errors: [String] = []
     }
 
+    private static let maxImportBytes = 5_000_000 // 5 MB
+
     static func importData(from url: URL, into context: ModelContext) throws -> ImportResult {
+        let attrs = try? FileManager.default.attributesOfItem(atPath: url.path)
+        if let size = attrs?[.size] as? Int, size > Self.maxImportBytes {
+            throw ImportError.fileTooLarge
+        }
         let raw = try String(contentsOf: url, encoding: .utf8)
         let lines = raw.components(separatedBy: .newlines).map { $0.trimmingCharacters(in: .whitespaces) }
         guard !lines.isEmpty else { throw ImportError.emptyFile }
@@ -237,11 +243,13 @@ struct CSVImporter {
     enum ImportError: LocalizedError {
         case emptyFile
         case missingColumns
+        case fileTooLarge
 
         var errorDescription: String? {
             switch self {
             case .emptyFile: return "The file is empty."
             case .missingColumns: return "CSV must have a 'date' column and at least 'reading' or 'dose'."
+            case .fileTooLarge: return "File exceeds the 5 MB import limit."
             }
         }
     }

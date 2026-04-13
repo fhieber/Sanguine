@@ -69,6 +69,11 @@ struct SettingsView: View {
                     }
                 } header: {
                     Text("Target Range")
+                } footer: {
+                    if lowTarget >= highTarget {
+                        Label("Low target must be less than High target.", systemImage: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.orange)
+                    }
                 }
                 .onAppear {
                     lowTargetText  = String(format: "%.1f", lowTarget)

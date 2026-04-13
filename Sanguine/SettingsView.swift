@@ -237,7 +237,7 @@ struct SettingsView: View {
                 }
             }
             .scrollDismissesKeyboard(.immediately)
-            .onTapGesture { isTargetFocused = false }
+            .simultaneousGesture(TapGesture().onEnded { isTargetFocused = false })
             .navigationTitle("Settings")
             .sheet(item: $exportFile) { file in
                 ActivityView(url: file.url) { exportFile = nil }

@@ -249,13 +249,12 @@ final class DoseTimeLabelTests: XCTestCase {
 
     func testOnTheHour() {
         let label = doseTimeLabel(hour: 18, minute: 0, timezoneID: "Europe/Berlin")
-        XCTAssertTrue(label.contains("6pm") || label.contains("6PM") || label.contains("18"),
-                      "Expected 6pm in label, got: \(label)")
+        XCTAssertTrue(label.contains("18:00"), "Expected 18:00 in label, got: \(label)")
     }
 
     func testWithMinutes() {
         let label = doseTimeLabel(hour: 8, minute: 30, timezoneID: "Europe/Berlin")
-        XCTAssertTrue(label.contains("8:30"), "Expected 8:30 in label, got: \(label)")
+        XCTAssertTrue(label.contains("08:30"), "Expected 08:30 in label, got: \(label)")
     }
 
     func testTimezoneAbbreviationIncluded() {

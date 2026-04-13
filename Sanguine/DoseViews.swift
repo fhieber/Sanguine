@@ -453,7 +453,7 @@ struct DoseDetailView: View {
                 if entry.isPlanned != false {
                     LabeledContent("Time", value: doseTimeLabel(hour: doseHour, minute: doseMinute, timezoneID: doseTimezoneID))
                 } else {
-                    LabeledContent("Time", value: entry.date.formatted(date: .omitted, time: .shortened))
+                    LabeledContent("Time", value: formattedDateTime(entry.date))
                 }
             }
 

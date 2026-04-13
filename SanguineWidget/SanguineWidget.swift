@@ -27,9 +27,9 @@ struct SanguineProvider: TimelineProvider {
             readingDate: .now,
             readingInRange: true,
             todayDose: 1.25,
-            todayDoseTime: "6pm CET",
+            todayDoseTime: "18:00 CET",
             todayDoseTaken: false,
-            doseTimeLocal: "6:00 PM",
+            doseTimeLocal: "18:00",
             todayDoseActualTime: nil,
             isReadingReminderToday: false
         )
@@ -70,8 +70,7 @@ struct SanguineProvider: TimelineProvider {
         let doseTimeLocal: String
         if let doseDate = tzCal.date(from: doseComps) {
             let fmt = DateFormatter()
-            fmt.timeStyle = .short
-            fmt.dateStyle = .none
+            fmt.dateFormat = "HH:mm"
             // fmt.timeZone defaults to system timezone — converts to user's local TZ
             doseTimeLocal = fmt.string(from: doseDate)
         } else {
@@ -108,8 +107,7 @@ struct SanguineProvider: TimelineProvider {
                 } else {
                     todayDoseTaken = true
                     let fmt = DateFormatter()
-                    fmt.timeStyle = .short
-                    fmt.dateStyle = .none
+                    fmt.dateFormat = "HH:mm"
                     todayDoseActualTime = fmt.string(from: entry.date)
                 }
             }
@@ -255,7 +253,7 @@ struct SanguineWidget: Widget {
 #Preview(as: .systemMedium) {
     SanguineWidget()
 } timeline: {
-    SanguineEntry(date: .now, latestReading: 2.5, readingDate: .now, readingInRange: true, todayDose: 1.25, todayDoseTime: "6pm CET", todayDoseTaken: false, doseTimeLocal: "6:00 PM", todayDoseActualTime: nil, isReadingReminderToday: false)
-    SanguineEntry(date: .now, latestReading: 3.8, readingDate: .now, readingInRange: false, todayDose: 1.0, todayDoseTime: nil, todayDoseTaken: true, doseTimeLocal: "6:00 PM", todayDoseActualTime: "4:32 PM", isReadingReminderToday: true)
-    SanguineEntry(date: .now, latestReading: 2.1, readingDate: .now, readingInRange: true, todayDose: nil, todayDoseTime: nil, todayDoseTaken: false, doseTimeLocal: "6:00 PM", todayDoseActualTime: nil, isReadingReminderToday: false)
+    SanguineEntry(date: .now, latestReading: 2.5, readingDate: .now, readingInRange: true, todayDose: 1.25, todayDoseTime: "18:00 CET", todayDoseTaken: false, doseTimeLocal: "18:00", todayDoseActualTime: nil, isReadingReminderToday: false)
+    SanguineEntry(date: .now, latestReading: 3.8, readingDate: .now, readingInRange: false, todayDose: 1.0, todayDoseTime: nil, todayDoseTaken: true, doseTimeLocal: "18:00", todayDoseActualTime: "16:32", isReadingReminderToday: true)
+    SanguineEntry(date: .now, latestReading: 2.1, readingDate: .now, readingInRange: true, todayDose: nil, todayDoseTime: nil, todayDoseTaken: false, doseTimeLocal: "18:00", todayDoseActualTime: nil, isReadingReminderToday: false)
 }

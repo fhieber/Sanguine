@@ -264,7 +264,7 @@ struct ReadingRowView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(String(format: "%.1f", reading.value))
                     .font(.headline)
-                Text(reading.recordedAt.formatted(date: .abbreviated, time: .shortened))
+                Text(formattedDateTime(reading.recordedAt, dateStyle: .medium))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 if !reading.note.isEmpty {
@@ -298,7 +298,7 @@ struct ReadingDetailView: View {
         Form {
             Section("Value") {
                 LabeledContent("Reading", value: String(format: "%.1f", reading.value))
-                LabeledContent("Date", value: reading.recordedAt.formatted(date: .long, time: .shortened))
+                LabeledContent("Date", value: formattedDateTime(reading.recordedAt, dateStyle: .long))
             }
             if !priorDoses.isEmpty {
                 Section {

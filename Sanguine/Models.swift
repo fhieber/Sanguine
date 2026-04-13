@@ -59,7 +59,7 @@ extension Notification.Name {
 
 // MARK: - Dose Time Formatting
 
-/// Formats a stored hour/minute/timezone into a human-readable label, e.g. "6pm CET".
+/// Formats a stored hour/minute/timezone into a human-readable label, e.g. "18:00 CET".
 func doseTimeLabel(hour: Int, minute: Int, timezoneID: String) -> String {
     let tz = TimeZone(identifier: timezoneID) ?? .current
     let abbr = tz.abbreviation(for: .now) ?? tz.identifier
@@ -69,9 +69,22 @@ func doseTimeLabel(hour: Int, minute: Int, timezoneID: String) -> String {
     guard let date = cal.date(from: c) else { return "" }
     let fmt = DateFormatter()
     fmt.timeZone = tz
-    fmt.dateFormat = minute == 0 ? "ha" : "h:mma"
-    fmt.amSymbol = "am"; fmt.pmSymbol = "pm"
+    fmt.dateFormat = "HH:mm"
     return "\(fmt.string(from: date)) \(abbr)"
+}
+
+/// Locale-independent date+time string with 24-hour time.
+/// dateStyle == .none returns time only (e.g. "18:30").
+/// Otherwise returns "<localized date>, HH:mm" (e.g. "Jan 15, 2024, 18:30").
+func formattedDateTime(_ date: Date, dateStyle: DateFormatter.Style = .none) -> String {
+    let timeFmt = DateFormatter()
+    timeFmt.dateFormat = "HH:mm"
+    let timeStr = timeFmt.string(from: date)
+    guard dateStyle != .none else { return timeStr }
+    let dateFmt = DateFormatter()
+    dateFmt.dateStyle = dateStyle
+    dateFmt.timeStyle = .none
+    return "\(dateFmt.string(from: date)), \(timeStr)"
 }
 
 // MARK: - Dose Planning

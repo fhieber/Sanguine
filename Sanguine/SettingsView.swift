@@ -236,12 +236,8 @@ struct SettingsView: View {
                     LabeledContent("Data", value: "Stored on device only")
                 }
             }
-            .toolbar {
-                ToolbarItemGroup(placement: .keyboard) {
-                    Spacer()
-                    Button("Done") { isTargetFocused = false }
-                }
-            }
+            .scrollDismissesKeyboard(.immediately)
+            .onTapGesture { isTargetFocused = false }
             .navigationTitle("Settings")
             .sheet(item: $exportFile) { file in
                 ActivityView(url: file.url)

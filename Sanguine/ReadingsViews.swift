@@ -495,62 +495,66 @@ struct ReadingChartView: View {
 
     private var visibleSpan: TimeInterval { visibleEnd.timeIntervalSince(visibleStart) }
 
-    // Extracted to its own property so the compiler can type-check body and chart
-    // independently — the combined expression was too large for the type checker.
-    private var chartView: some View {
-        Chart {
-            // Target range band
-            RectangleMark(
-                xStart: .value("Start", dataStart),
-                xEnd:   .value("End",   dataEnd),
-                yStart: .value("Low",   lowTarget),
-                yEnd:   .value("High",  highTarget)
+    // The Chart content and the Chart+modifiers chain are each extracted into their own
+    // properties so the compiler can type-check them independently. Under -O WMO the
+    // combined expression exceeded the type-checker complexity budget.
+    @ChartContentBuilder
+    private var chartContent: some ChartContent {
+        // Target range band
+        RectangleMark(
+            xStart: .value("Start", dataStart),
+            xEnd:   .value("End",   dataEnd),
+            yStart: .value("Low",   lowTarget),
+            yEnd:   .value("High",  highTarget)
+        )
+        .foregroundStyle(Color.green.opacity(0.08))
+
+        // Target range lines
+        RuleMark(y: .value("Low", lowTarget))
+            .foregroundStyle(Color.green.opacity(0.5))
+            .lineStyle(StrokeStyle(lineWidth: 1, dash: [5, 4]))
+
+        RuleMark(y: .value("High", highTarget))
+            .foregroundStyle(Color.green.opacity(0.5))
+            .lineStyle(StrokeStyle(lineWidth: 1, dash: [5, 4]))
+
+        // Line
+        ForEach(sorted) { r in
+            LineMark(
+                x: .value("Date", r.recordedAt),
+                y: .value("Reading", r.value)
             )
-            .foregroundStyle(Color.green.opacity(0.08))
+            .foregroundStyle(Color.blue.opacity(0.6))
+            .interpolationMethod(.catmullRom)
+        }
 
-            // Target range lines
-            RuleMark(y: .value("Low", lowTarget))
-                .foregroundStyle(Color.green.opacity(0.5))
-                .lineStyle(StrokeStyle(lineWidth: 1, dash: [5, 4]))
+        // Points
+        ForEach(sorted) { r in
+            PointMark(
+                x: .value("Date", r.recordedAt),
+                y: .value("Reading", r.value)
+            )
+            .foregroundStyle(r.value >= lowTarget && r.value <= highTarget ? Color.green : Color.red)
+            .symbolSize(40)
+        }
 
-            RuleMark(y: .value("High", highTarget))
-                .foregroundStyle(Color.green.opacity(0.5))
-                .lineStyle(StrokeStyle(lineWidth: 1, dash: [5, 4]))
-
-            // Line
-            ForEach(sorted) { r in
+        // Polynomial trendline — drawn last so it appears on top
+        if !trendPoints.isEmpty {
+            ForEach(trendPoints) { pt in
                 LineMark(
-                    x: .value("Date", r.recordedAt),
-                    y: .value("Reading", r.value)
+                    x: .value("Date", pt.date),
+                    y: .value("Trend", pt.value),
+                    series: .value("Series", "Trend")
                 )
-                .foregroundStyle(Color.blue.opacity(0.6))
-                .interpolationMethod(.catmullRom)
-            }
-
-            // Points
-            ForEach(sorted) { r in
-                PointMark(
-                    x: .value("Date", r.recordedAt),
-                    y: .value("Reading", r.value)
-                )
-                .foregroundStyle(r.value >= lowTarget && r.value <= highTarget ? Color.green : Color.red)
-                .symbolSize(40)
-            }
-
-            // Polynomial trendline — drawn last so it appears on top
-            if !trendPoints.isEmpty {
-                ForEach(trendPoints) { pt in
-                    LineMark(
-                        x: .value("Date", pt.date),
-                        y: .value("Trend", pt.value),
-                        series: .value("Series", "Trend")
-                    )
-                    .foregroundStyle(Color.orange.opacity(0.85))
-                    .lineStyle(StrokeStyle(lineWidth: 2, dash: [6, 4]))
-                    .interpolationMethod(.linear)
-                }
+                .foregroundStyle(Color.orange.opacity(0.85))
+                .lineStyle(StrokeStyle(lineWidth: 2, dash: [6, 4]))
+                .interpolationMethod(.linear)
             }
         }
+    }
+
+    private var chartView: some View {
+        Chart { chartContent }
         .chartYScale(domain: yDomain)
         .smartChartXAxis(visibleStart: visibleStart, visibleEnd: visibleEnd, visibleSpan: visibleSpan)
         .chartYAxis {

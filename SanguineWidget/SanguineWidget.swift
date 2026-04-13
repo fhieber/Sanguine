@@ -143,6 +143,17 @@ struct SanguineWidgetEntryView: View {
         return Calendar.current.dateComponents([.day], from: d, to: .now).day
     }
 
+    private var timeAgoText: String? {
+        guard let d = entry.readingDate else { return nil }
+        let components = Calendar.current.dateComponents([.day, .hour], from: d, to: .now)
+        let days = components.day ?? 0
+        if days < 1 {
+            let hours = components.hour ?? 0
+            return "\(hours)h ago"
+        }
+        return "\(days)d ago"
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: isSmall ? 4 : 8) {
             // Row 1: Latest reading — taps to add new reading
@@ -157,7 +168,7 @@ struct SanguineWidgetEntryView: View {
                           (staleReading || entry.readingInRange == false ? .red : .green))
                         .font(isSmall ? .body : .title2)
                     VStack(alignment: .leading, spacing: 1) {
-                        Text(daysSinceReading.map { "Reading\n\($0)d ago" } ?? "Reading")
+                        Text(timeAgoText.map { "Reading\n\($0)" } ?? "Reading")
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                         HStack(alignment: .firstTextBaseline, spacing: 4) {

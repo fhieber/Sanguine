@@ -347,9 +347,12 @@ struct AddReadingView: View {
     @State private var days: [PlannedDay] = []
     @FocusState private var focusedDayIndex: Int?
     @FocusState private var valueFieldFocused: Bool
+    @State private var saveError: String? = nil
+    @State private var showingSaveError = false
 
     private var parsedValue: Double? {
-        Double(valueText.replacingOccurrences(of: ",", with: "."))
+        guard let v = Double(valueText.replacingOccurrences(of: ",", with: ".")), v > 0 else { return nil }
+        return v
     }
 
     var body: some View {
@@ -426,6 +429,11 @@ struct AddReadingView: View {
             }
             .onAppear { setupDays() }
             .onChange(of: date) { setupDays() }
+            .alert("Could Not Save", isPresented: $showingSaveError) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(saveError ?? "An unknown error occurred.")
+            }
         }
     }
 
@@ -442,10 +450,16 @@ struct AddReadingView: View {
         guard let v = parsedValue else { return }
         modelContext.insert(Reading(value: v, recordedAt: date, note: note))
         upsertPlannedDays(days, doses: allDoses, into: modelContext)
-        try? modelContext.save()
-        WidgetCenter.shared.reloadAllTimelines()
-        NotificationManager.shared.removeDeliveredReadingReminder()
-        dismiss()
+        do {
+            try modelContext.save()
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            WidgetCenter.shared.reloadAllTimelines()
+            NotificationManager.shared.removeDeliveredReadingReminder()
+            dismiss()
+        } catch {
+            saveError = error.localizedDescription
+            showingSaveError = true
+        }
     }
 }
 
@@ -659,7 +673,8 @@ struct ReadingStatsGrid: View {
             StatCard(
                 title: "Latest",
                 value: stats.latest.map { String(format: "%.1f", $0.value) } ?? "—",
-                subtitle: stats.latest.map { $0.recordedAt.formatted(date: .abbreviated, time: .omitted) }
+                subtitle: stats.latest.map { $0.recordedAt.formatted(date: .abbreviated, time: .omitted) },
+                valueColor: stats.latest.map { stats.isInRange($0) ? .green : .red } ?? .primary
             )
             StatCard(
                 title: "Average",

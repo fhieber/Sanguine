@@ -563,7 +563,7 @@ struct ReadingChartView: View {
             // regardless of scroll position (unlike .annotation(position: .trailing)
             // on a RuleMark, which is placed at the data domain's trailing edge and
             // scrolls off-screen when the user pans left).
-            AxisMarks(values: [lowTarget, highTarget], position: .trailing, content: { value in
+            AxisMarks(position: .trailing, values: [lowTarget, highTarget], content: { value in
                 AxisValueLabel(anchor: .leading) {
                     if let v = value.as(Double.self) {
                         Text(String(format: "%.1f", v))

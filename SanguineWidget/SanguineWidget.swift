@@ -153,7 +153,7 @@ struct SanguineWidgetEntryView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: isSmall ? 4 : 8) {
+        VStack(spacing: 0) {
             // Row 1: Latest reading — taps to add new reading
             Link(destination: URL(string: "sanguine://add-reading")!) {
                 HStack(spacing: 8) {
@@ -165,28 +165,23 @@ struct SanguineWidgetEntryView: View {
                         .foregroundStyle(showReadingCalendar ? Color.primary :
                           (staleReading || entry.readingInRange == false ? .red : .green))
                         .font(isSmall ? .body : .title2)
+                    Text(entry.latestReading.map { String(format: "%.1f", $0) } ?? "—")
+                        .font(isSmall ? .headline : .title2)
+                        .bold()
                     VStack(alignment: .leading, spacing: 1) {
-                        Text(timeAgoText.map { "Reading\n\($0)" } ?? "Reading")
+                        Text("Reading")
                             .font(.caption2)
                             .foregroundStyle(.secondary)
-                        HStack(alignment: .firstTextBaseline, spacing: 4) {
-                            Text(entry.latestReading.map { String(format: "%.1f", $0) } ?? "—")
-                                .font(isSmall ? .headline : .title2)
-                                .bold()
-                            if !isSmall, let d = entry.readingDate {
-                                Text(d.formatted(date: .abbreviated, time: .omitted))
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
+                        Text(timeAgoText ?? "")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
                     }
                     Spacer()
                 }
-                .padding(isSmall ? 4 : 10)
-                .background(isSmall ? AnyShapeStyle(.clear) : AnyShapeStyle(.thinMaterial), in: RoundedRectangle(cornerRadius: 10))
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            if isSmall { Divider() }
+            Divider()
 
             // Row 2: Today's dose — taps to open dose detail
             Link(destination: URL(string: "sanguine://dose-detail")!) {
@@ -194,40 +189,23 @@ struct SanguineWidgetEntryView: View {
                     Image(systemName: entry.todayDoseTaken ? "checkmark.circle.fill" : (entry.todayDose != nil ? "calendar.badge.checkmark" : "exclamationmark.circle.fill"))
                         .foregroundStyle(entry.todayDoseTaken ? .green : (entry.todayDose != nil ? .primary : .red))
                         .font(isSmall ? .body : .title2)
+                    Text(entry.todayDose?.doseFormatted ?? "—")
+                        .font(isSmall ? .headline : .title2)
+                        .bold()
                     VStack(alignment: .leading, spacing: 1) {
-                        Text("Today\n\(entry.todayDoseTaken && entry.todayDoseActualTime != nil ? entry.todayDoseActualTime! : entry.doseTimeLocal)")
+                        Text("Today")
                             .font(.caption2)
                             .foregroundStyle(.secondary)
-                            .lineLimit(2)
-                            .minimumScaleFactor(0.7)
-                        if entry.todayDoseTaken {
-                            Text(entry.todayDose?.doseFormatted ?? "—")
-                                .font(isSmall ? .headline : .title2)
-                                .bold()
-                        } else if let dose = entry.todayDose {
-                            HStack(alignment: .firstTextBaseline, spacing: 4) {
-                                Text(dose.doseFormatted)
-                                    .font(isSmall ? .headline : .title2)
-                                    .bold()
-                                if !isSmall, let t = entry.todayDoseTime {
-                                    Text("@ \(t)")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                        } else {
-                            Text("—")
-                                .font(isSmall ? .headline : .title2)
-                                .bold()
-                        }
+                        Text(entry.todayDoseTaken ? (entry.todayDoseActualTime ?? entry.doseTimeLocal) : entry.doseTimeLocal)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
                     }
                     Spacer()
                 }
-                .padding(isSmall ? 4 : 10)
-                .background(isSmall ? AnyShapeStyle(.clear) : AnyShapeStyle(.thinMaterial), in: RoundedRectangle(cornerRadius: 10))
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .padding(isSmall ? 4 : 12)
+        .padding(isSmall ? 8 : 12)
     }
 
 }

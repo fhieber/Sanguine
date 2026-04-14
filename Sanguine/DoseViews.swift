@@ -553,6 +553,7 @@ struct AddDosePlanView: View {
     @Query(sort: \DoseEntry.date) private var allDoses: [DoseEntry]
 
     @State private var days: [PlannedDay] = []
+    @State private var weeklySchedule: WeeklySchedule = .empty
     @FocusState private var focusedIndex: Int?
 
     var body: some View {
@@ -588,8 +589,17 @@ struct AddDosePlanView: View {
                     Button("Cancel") { dismiss() }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Save") { save() }
-                        .fontWeight(.semibold)
+                    HStack(spacing: 16) {
+                        if !weeklySchedule.isEmpty {
+                            Button {
+                                applyTemplate(weeklySchedule, to: &days)
+                            } label: {
+                                Image(systemName: "wand.and.stars")
+                            }
+                        }
+                        Button("Save") { save() }
+                            .fontWeight(.semibold)
+                    }
                 }
             }
             .toolbar {
@@ -609,6 +619,7 @@ struct AddDosePlanView: View {
                 }
             }
             .onAppear {
+                weeklySchedule = UserDefaults.appGroup.weeklySchedule
                 setupDays()
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                     focusedIndex = 0
@@ -619,10 +630,12 @@ struct AddDosePlanView: View {
 
     private func setupDays() {
         days = buildPlannedDays(startingAt: Calendar.current.startOfDay(for: .now), in: allDoses)
+        applyTemplate(weeklySchedule, to: &days)
     }
 
     private func addNextDay(after index: Int) {
         let next = appendNextDayIfNeeded(after: index, days: &days, doses: allDoses)
+        applyTemplate(weeklySchedule, to: &days)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { focusedIndex = next }
     }
 

@@ -108,7 +108,16 @@ struct SettingsView: View {
                     doseTime = Calendar.current.date(from: c) ?? Date()
                 }
 
-                // 3) Reading Reminder
+                // 3) Weekly Default Schedule
+                Section {
+                    NavigationLink("Weekly Default Schedule") {
+                        WeeklyScheduleEditorView()
+                    }
+                } footer: {
+                    Text("Default doses auto-fill when planning. Override any day before saving.")
+                }
+
+                // 4) Reading Reminder
                 Section {
                     Toggle("Reminder", isOn: $readingReminderEnabled)
                         .onChange(of: readingReminderEnabled) {
@@ -159,7 +168,7 @@ struct SettingsView: View {
                     readingReminderTime = Calendar.current.date(from: c) ?? Date()
                 }
 
-                // 4) Data
+                // 5) Data
                 Section {
                     Button("Import") { showingFilePicker = true }
                     Button("Export") { exportFile = ExportFile(url: makeExportURL()) }
@@ -230,7 +239,7 @@ struct SettingsView: View {
                     Text("This will delete all existing data and replace it with generated sample data.")
                 }
 
-                // 5) Version
+                // 6) Version
                 Section("About") {
                     LabeledContent("Version", value: "1.3")
                     LabeledContent("Data", value: "Stored on device only")
@@ -369,6 +378,73 @@ struct SettingsView: View {
         let csv = CSVImporter.exportCSV(readings: Array(readings), doseEntries: Array(doseEntries))
         try? csv.write(to: url, atomically: true, encoding: .utf8)
         return url
+    }
+}
+
+// MARK: - Weekly Schedule Editor
+
+struct WeeklyScheduleEditorView: View {
+    // Mon–Sun in display order with Calendar weekday integers
+    private let weekdays: [(String, Int)] = [
+        ("Monday", 2), ("Tuesday", 3), ("Wednesday", 4), ("Thursday", 5),
+        ("Friday", 6), ("Saturday", 7), ("Sunday", 1)
+    ]
+    @State private var schedule: WeeklySchedule = .empty
+
+    var body: some View {
+        Form {
+            Section {
+                ForEach(weekdays, id: \.1) { label, wd in
+                    WeeklyScheduleDayRow(label: label, weekday: wd, schedule: $schedule)
+                }
+            } header: {
+                Text("Default Dose per Day")
+            } footer: {
+                Text("Leave blank for no default on that day.")
+            }
+
+            Section {
+                Button("Clear All", role: .destructive) {
+                    schedule = .empty
+                    UserDefaults.appGroup.weeklySchedule = schedule
+                }
+            }
+        }
+        .navigationTitle("Weekly Schedule")
+        .navigationBarTitleDisplayMode(.inline)
+        .scrollDismissesKeyboard(.immediately)
+        .onAppear { schedule = UserDefaults.appGroup.weeklySchedule }
+    }
+}
+
+struct WeeklyScheduleDayRow: View {
+    let label: String
+    let weekday: Int
+    @Binding var schedule: WeeklySchedule
+    @State private var text: String = ""
+
+    var body: some View {
+        HStack {
+            Text(label)
+            Spacer()
+            TextField("—", text: $text)
+                .keyboardType(.decimalPad)
+                .multilineTextAlignment(.trailing)
+                .frame(width: 60)
+                .onAppear {
+                    if let d = schedule.doses[weekday], d > 0 { text = d.doseFormatted }
+                }
+                .onChange(of: text) {
+                    var updated = schedule
+                    if let v = Double(text.replacingOccurrences(of: ",", with: ".")), v > 0 {
+                        updated.doses[weekday] = v
+                    } else {
+                        updated.doses.removeValue(forKey: weekday)
+                    }
+                    schedule = updated
+                    UserDefaults.appGroup.weeklySchedule = updated
+                }
+        }
     }
 }
 

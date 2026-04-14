@@ -95,6 +95,36 @@ struct PlannedDay: Identifiable {
     var doseText: String
 }
 
+/// A user-configured default dose for each weekday.
+/// Uses Calendar weekday integers: 1=Sun, 2=Mon, 3=Tue, 4=Wed, 5=Thu, 6=Fri, 7=Sat
+struct WeeklySchedule: Codable {
+    var doses: [Int: Double]  // absent key or ≤0 = no default for that day
+
+    static let empty = WeeklySchedule(doses: [:])
+
+    var isEmpty: Bool { doses.values.allSatisfy { $0 <= 0 } }
+
+    func dose(for date: Date) -> Double? {
+        let wd = Calendar.current.component(.weekday, from: date)
+        guard let d = doses[wd], d > 0 else { return nil }
+        return d
+    }
+}
+
+extension UserDefaults {
+    var weeklySchedule: WeeklySchedule {
+        get {
+            guard let data = data(forKey: "weeklyDoseSchedule"),
+                  let decoded = try? JSONDecoder().decode(WeeklySchedule.self, from: data)
+            else { return .empty }
+            return decoded
+        }
+        set {
+            set(try? JSONEncoder().encode(newValue), forKey: "weeklyDoseSchedule")
+        }
+    }
+}
+
 /// Returns the existing DoseEntry for a given calendar day, if any.
 func existingDose(for date: Date, in doses: [DoseEntry]) -> DoseEntry? {
     doses.first { Calendar.current.isDate($0.date, inSameDayAs: date) }
@@ -140,6 +170,16 @@ func upsertPlannedDays(_ days: [PlannedDay], doses: [DoseEntry], into context: M
             if existing.isPlanned == nil { existing.isPlanned = true }
         } else {
             context.insert(DoseEntry(date: day.date, dose: dose, isPlanned: true))
+        }
+    }
+}
+
+/// Fills empty doseText fields in `days` from the weekly schedule. Existing values are not overwritten.
+func applyTemplate(_ schedule: WeeklySchedule, to days: inout [PlannedDay]) {
+    guard !schedule.isEmpty else { return }
+    for i in days.indices where days[i].doseText.isEmpty {
+        if let d = schedule.dose(for: days[i].date) {
+            days[i].doseText = d.doseFormatted
         }
     }
 }

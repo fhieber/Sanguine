@@ -435,8 +435,13 @@ struct WeeklyScheduleDayRow: View {
                     if let d = schedule.doses[weekday], d > 0 { text = d.doseFormatted }
                 }
                 .onChange(of: text) {
+                    // Normalise to English decimal: replace comma with period in the displayed text
+                    if text.contains(",") {
+                        text = text.replacingOccurrences(of: ",", with: ".")
+                        return  // onChange fires again with the normalised string
+                    }
                     var updated = schedule
-                    if let v = Double(text.replacingOccurrences(of: ",", with: ".")), v > 0 {
+                    if let v = Double(text), v > 0 {
                         updated.doses[weekday] = v
                     } else {
                         updated.doses.removeValue(forKey: weekday)

@@ -237,7 +237,7 @@ struct SettingsView: View {
                 }
             }
             .scrollDismissesKeyboard(.immediately)
-            .simultaneousGesture(TapGesture().onEnded { isTargetFocused = false })
+            .background(DismissKeyboardOnTap())
             .navigationTitle("Settings")
             .sheet(item: $exportFile) { file in
                 ActivityView(url: file.url) { exportFile = nil }
@@ -395,4 +395,24 @@ struct ActivityView: UIViewControllerRepresentable {
 struct ExportFile: Identifiable {
     let id = UUID()
     let url: URL
+}
+
+/// Installs a tap gesture recognizer with cancelsTouchesInView = false so that
+/// tapping anywhere dismisses the keyboard without blocking button taps.
+private struct DismissKeyboardOnTap: UIViewRepresentable {
+    func makeUIView(context: Context) -> UIView {
+        let view = UIView(frame: .zero)
+        view.backgroundColor = .clear
+        let tap = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleTap))
+        tap.cancelsTouchesInView = false
+        view.addGestureRecognizer(tap)
+        return view
+    }
+    func updateUIView(_ uiView: UIView, context: Context) {}
+    func makeCoordinator() -> Coordinator { Coordinator() }
+    class Coordinator: NSObject {
+        @objc func handleTap() {
+            UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+        }
+    }
 }

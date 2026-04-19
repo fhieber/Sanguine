@@ -153,21 +153,28 @@ struct SanguineWidgetEntryView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
+        Grid(horizontalSpacing: 4, verticalSpacing: 0) {
             // Row 1: Latest reading — taps to add new reading
-            Link(destination: URL(string: "sanguine://add-reading")!) {
-                HStack(spacing: 4) {
-                    let staleReading = (daysSinceReading ?? 0) > 7
-                    let readingTakenToday = entry.readingDate.map { Calendar.current.isDateInToday($0) } ?? false
-                    let showReadingCalendar = entry.isReadingReminderToday && !readingTakenToday
+            GridRow {
+                let staleReading = (daysSinceReading ?? 0) > 7
+                let readingTakenToday = entry.readingDate.map { Calendar.current.isDateInToday($0) } ?? false
+                let showReadingCalendar = entry.isReadingReminderToday && !readingTakenToday
+
+                Link(destination: URL(string: "sanguine://add-reading")!) {
                     Image(systemName: showReadingCalendar ? "calendar.circle.fill" :
                           (staleReading ? "exclamationmark.circle.fill" : "checkmark.circle.fill"))
                         .foregroundStyle(showReadingCalendar ? Color.primary :
                           (staleReading || entry.readingInRange == false ? .red : .green))
                         .font(isSmall ? .body : .title2)
+                }
+
+                Link(destination: URL(string: "sanguine://add-reading")!) {
                     Text(entry.latestReading.map { String(format: "%.1f", $0) } ?? "—")
                         .font(isSmall ? .headline : .title2)
                         .bold()
+                }
+
+                Link(destination: URL(string: "sanguine://add-reading")!) {
                     VStack(alignment: .leading, spacing: 1) {
                         Text("Reading")
                             .font(.caption2)
@@ -176,22 +183,31 @@ struct SanguineWidgetEntryView: View {
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                     }
-                    Spacer()
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .frame(maxHeight: .infinity)
 
-            Divider()
+            GridRow {
+                Divider()
+                    .gridCellColumns(3)
+            }
 
             // Row 2: Today's dose — taps to open dose detail
-            Link(destination: URL(string: "sanguine://dose-detail")!) {
-                HStack(spacing: 4) {
+            GridRow {
+                Link(destination: URL(string: "sanguine://dose-detail")!) {
                     Image(systemName: entry.todayDoseTaken ? "checkmark.circle.fill" : (entry.todayDose != nil ? "calendar.badge.checkmark" : "exclamationmark.circle.fill"))
                         .foregroundStyle(entry.todayDoseTaken ? .green : (entry.todayDose != nil ? .primary : .red))
                         .font(isSmall ? .body : .title2)
+                }
+
+                Link(destination: URL(string: "sanguine://dose-detail")!) {
                     Text(entry.todayDose?.doseFormatted ?? "—")
                         .font(isSmall ? .headline : .title2)
                         .bold()
+                }
+
+                Link(destination: URL(string: "sanguine://dose-detail")!) {
                     VStack(alignment: .leading, spacing: 1) {
                         Text("Today")
                             .font(.caption2)
@@ -200,12 +216,12 @@ struct SanguineWidgetEntryView: View {
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                     }
-                    Spacer()
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .frame(maxHeight: .infinity)
         }
-        .padding(isSmall ? 6 : 8)
+        .padding(isSmall ? 4 : 6)
     }
 
 }

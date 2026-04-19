@@ -50,6 +50,7 @@ jobs:
 
       - name: Build archive
         run: |
+          BUILD_NUMBER=$(git rev-list --count HEAD)
           xcodebuild archive \
             -project Sanguine.xcodeproj \
             -scheme Sanguine \
@@ -58,7 +59,7 @@ jobs:
             -archivePath $RUNNER_TEMP/Sanguine.xcarchive \
             CODE_SIGN_IDENTITY="Apple Distribution" \
             DEVELOPMENT_TEAM=4DTYZA3KVS \
-            CURRENT_PROJECT_VERSION=${{ github.run_number + 100 }}
+            CURRENT_PROJECT_VERSION=$BUILD_NUMBER
 
       - name: Export IPA
         run: |

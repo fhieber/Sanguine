@@ -347,8 +347,14 @@ struct AddReadingView: View {
     @State private var date = Date()
     @State private var note = ""
     @State private var days: [PlannedDay] = []
-    @FocusState private var focusedDayIndex: Int?
-    @FocusState private var valueFieldFocused: Bool
+    @State private var weeklySchedule: WeeklySchedule = .empty
+
+    private enum Field: Hashable {
+        case readingValue
+        case day(Int)
+    }
+    @FocusState private var focusedField: Field?
+
     @State private var saveError: String? = nil
     @State private var showingSaveError = false
 
@@ -364,7 +370,7 @@ struct AddReadingView: View {
                     TextField("e.g. 2.5", text: $valueText)
                         .keyboardType(.decimalPad)
                         .font(.title2.monospacedDigit())
-                        .focused($valueFieldFocused)
+                        .focused($focusedField, equals: .readingValue)
                 }
                 Section("Date & Time") {
                     DatePicker("Recorded", selection: $date, in: ...Date.now, displayedComponents: [.date, .hourAndMinute])
@@ -383,12 +389,12 @@ struct AddReadingView: View {
                                 .keyboardType(.decimalPad)
                                 .multilineTextAlignment(.trailing)
                                 .frame(width: 60)
-                                .focused($focusedDayIndex, equals: i)
+                                .focused($focusedField, equals: .day(i))
                                 .submitLabel(.next)
                                 .onSubmit { addNextDay(after: i) }
                         }
                         .contentShape(Rectangle())
-                        .onTapGesture { focusedDayIndex = i }
+                        .onTapGesture { focusedField = .day(i) }
                     }
                 } header: {
                     Text("Plan Doses")
@@ -410,26 +416,26 @@ struct AddReadingView: View {
             }
             .toolbar {
                 ToolbarItemGroup(placement: .keyboard) {
-                    if valueFieldFocused {
+                    if case .readingValue = focusedField {
                         Spacer()
-                        Button("Done") { valueFieldFocused = false }
+                        Button("Done") { focusedField = nil }
                     } else {
+                        let idx: Int = { if case .day(let i) = focusedField { return i }; return 0 }()
                         Button("Previous") {
-                            if let i = focusedDayIndex, i > 0 {
-                                focusedDayIndex = i - 1
-                            }
+                            if case .day(let i) = focusedField, i > 0 { focusedField = .day(i - 1) }
                         }
-                        .disabled((focusedDayIndex ?? 0) == 0)
+                        .disabled(idx == 0)
                         Spacer()
                         Button("Next") {
-                            if let i = focusedDayIndex {
-                                addNextDay(after: i)
-                            }
+                            if case .day(let i) = focusedField { addNextDay(after: i) }
                         }
                     }
                 }
             }
-            .onAppear { setupDays() }
+            .onAppear {
+                weeklySchedule = UserDefaults.appGroup.weeklySchedule
+                setupDays()
+            }
             .onChange(of: date) { setupDays() }
             .alert("Could Not Save", isPresented: $showingSaveError) {
                 Button("OK", role: .cancel) {}
@@ -441,11 +447,13 @@ struct AddReadingView: View {
 
     private func setupDays() {
         days = buildPlannedDays(startingAt: Calendar.current.startOfDay(for: date), in: allDoses)
+        applyTemplate(weeklySchedule, to: &days)
     }
 
     private func addNextDay(after index: Int) {
         let next = appendNextDayIfNeeded(after: index, days: &days, doses: allDoses)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { focusedDayIndex = next }
+        applyTemplate(weeklySchedule, to: &days)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { focusedField = .day(next) }
     }
 
     private func save() {

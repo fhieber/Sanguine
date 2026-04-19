@@ -58,7 +58,7 @@ jobs:
             -archivePath $RUNNER_TEMP/Sanguine.xcarchive \
             CODE_SIGN_IDENTITY="Apple Distribution" \
             DEVELOPMENT_TEAM=4DTYZA3KVS \
-            CURRENT_PROJECT_VERSION=${{ github.run_number }}
+            CURRENT_PROJECT_VERSION=${{ github.run_number + 100 }}
 
       - name: Export IPA
         run: |

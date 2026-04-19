@@ -60,32 +60,6 @@ jobs:
             DEVELOPMENT_TEAM=4DTYZA3KVS \
             CURRENT_PROJECT_VERSION=${{ github.run_number }}
 
-      - name: Export IPA
-        run: |
-          xcodebuild -exportArchive \
-            -archivePath $RUNNER_TEMP/Sanguine.xcarchive \
-            -exportOptionsPlist ExportOptions.plist \
-            -exportPath $RUNNER_TEMP/export
-
-      - name: Upload to TestFlight
-        env:
-          API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
-          API_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
-          API_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_KEY_BASE64 }}
-        run: |
-          mkdir -p ~/private_keys
-          echo -n "$API_KEY_BASE64" | base64 --decode -o ~/private_keys/AuthKey_${API_KEY_ID}.p8
-          OUTPUT=$(xcrun altool --upload-app \
-            --type ios \
-            --file $RUNNER_TEMP/export/Sanguine.ipa \
-            --apiKey $API_KEY_ID \
-            --apiIssuer $API_ISSUER_ID 2>&1)
-          echo "$OUTPUT"
-          if ! echo "$OUTPUT" | grep -q "UPLOAD SUCCEEDED"; then
-            echo "Upload failed: 'UPLOAD SUCCEEDED' not found in altool output"
-            exit 1
-          fi
-
       - name: Clean up keychain
         if: always()
         run: security delete-keychain $RUNNER_TEMP/signing.keychain-db

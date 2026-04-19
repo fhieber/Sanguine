@@ -241,7 +241,7 @@ struct SettingsView: View {
 
                 // 6) Version
                 Section("About") {
-                    LabeledContent("Version", value: "1.3")
+                    LabeledContent("Version", value: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "")
                     LabeledContent("Data", value: "Stored on device only")
                 }
             }

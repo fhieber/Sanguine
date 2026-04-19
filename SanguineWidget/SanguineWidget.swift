@@ -136,92 +136,84 @@ struct SanguineWidgetEntryView: View {
 
     private var isSmall: Bool { family == .systemSmall }
 
+    // Fixed column widths ensure the icon and value columns align between rows.
+    private var iconColumnWidth: CGFloat  { isSmall ? 16 : 28 }
+    private var valueColumnWidth: CGFloat { isSmall ? 34 : 52 }
+
     private var daysSinceReading: Int? {
         guard let d = entry.readingDate else { return nil }
         return Calendar.current.dateComponents([.day], from: d, to: .now).day
     }
 
-    private var timeAgoText: String? {
+    private var timeAgoValue: String? {
         guard let d = entry.readingDate else { return nil }
         let components = Calendar.current.dateComponents([.day, .hour], from: d, to: .now)
         let days = components.day ?? 0
-        if days < 1 {
-            let hours = components.hour ?? 0
-            return "\(hours)h ago"
-        }
-        return "\(days)d ago"
+        return days < 1 ? "\(components.hour ?? 0)h" : "\(days)d"
     }
 
     var body: some View {
-        Grid(horizontalSpacing: 4, verticalSpacing: 0) {
+        VStack(spacing: 0) {
             // Row 1: Latest reading — taps to add new reading
-            GridRow {
-                let staleReading = (daysSinceReading ?? 0) > 7
-                let readingTakenToday = entry.readingDate.map { Calendar.current.isDateInToday($0) } ?? false
-                let showReadingCalendar = entry.isReadingReminderToday && !readingTakenToday
-
-                Link(destination: URL(string: "sanguine://add-reading")!) {
+            Link(destination: URL(string: "sanguine://add-reading")!) {
+                HStack(spacing: 8) {
+                    let staleReading = (daysSinceReading ?? 0) > 7
+                    let readingTakenToday = entry.readingDate.map { Calendar.current.isDateInToday($0) } ?? false
+                    let showReadingCalendar = entry.isReadingReminderToday && !readingTakenToday
                     Image(systemName: showReadingCalendar ? "calendar.circle.fill" :
                           (staleReading ? "exclamationmark.circle.fill" : "checkmark.circle.fill"))
                         .foregroundStyle(showReadingCalendar ? Color.primary :
                           (staleReading || entry.readingInRange == false ? .red : .green))
                         .font(isSmall ? .body : .title2)
-                }
-
-                Link(destination: URL(string: "sanguine://add-reading")!) {
+                        .frame(width: iconColumnWidth)
                     Text(entry.latestReading.map { String(format: "%.1f", $0) } ?? "—")
                         .font(isSmall ? .headline : .title2)
                         .bold()
-                }
-
-                Link(destination: URL(string: "sanguine://add-reading")!) {
+                        .frame(width: valueColumnWidth, alignment: .leading)
                     VStack(alignment: .leading, spacing: 1) {
-                        Text("Reading")
+                        Text(timeAgoValue ?? "—")
                             .font(.caption2)
                             .foregroundStyle(.secondary)
-                        Text(timeAgoText ?? "")
+                            .lineLimit(1)
+                        Text("ago")
                             .font(.caption2)
                             .foregroundStyle(.secondary)
+                            .lineLimit(1)
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    Spacer()
                 }
             }
-            .frame(maxHeight: .infinity)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            GridRow {
-                Divider()
-                    .gridCellColumns(3)
-            }
+            Divider()
 
             // Row 2: Today's dose — taps to open dose detail
-            GridRow {
-                Link(destination: URL(string: "sanguine://dose-detail")!) {
+            Link(destination: URL(string: "sanguine://dose-detail")!) {
+                HStack(spacing: 8) {
                     Image(systemName: entry.todayDoseTaken ? "checkmark.circle.fill" : (entry.todayDose != nil ? "calendar.badge.checkmark" : "exclamationmark.circle.fill"))
                         .foregroundStyle(entry.todayDoseTaken ? .green : (entry.todayDose != nil ? .primary : .red))
                         .font(isSmall ? .body : .title2)
-                }
-
-                Link(destination: URL(string: "sanguine://dose-detail")!) {
+                        .frame(width: iconColumnWidth)
                     Text(entry.todayDose?.doseFormatted ?? "—")
                         .font(isSmall ? .headline : .title2)
                         .bold()
-                }
-
-                Link(destination: URL(string: "sanguine://dose-detail")!) {
+                        .frame(width: valueColumnWidth, alignment: .leading)
                     VStack(alignment: .leading, spacing: 1) {
                         Text("Today")
                             .font(.caption2)
                             .foregroundStyle(.secondary)
+                            .lineLimit(1)
                         Text(entry.todayDoseTaken ? (entry.todayDoseActualTime ?? entry.doseTimeLocal) : entry.doseTimeLocal)
                             .font(.caption2)
                             .foregroundStyle(.secondary)
+                            .lineLimit(1)
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    Spacer()
                 }
             }
-            .frame(maxHeight: .infinity)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .padding(isSmall ? 4 : 6)
+        .padding(isSmall ? 6 : 8)
     }
 
 }

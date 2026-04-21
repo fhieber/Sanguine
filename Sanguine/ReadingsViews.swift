@@ -631,9 +631,9 @@ struct ReadingChartView: View {
                         .stroke(showTrend ? Color.orange.opacity(0.85) : Color.secondary.opacity(0.5),
                                 style: StrokeStyle(lineWidth: 2, dash: [4, 3]))
                         .frame(width: 16, height: 2)
-                    Text(trendDegree.map { trendLabel($0) } ?? "Trend")
-                        .font(.caption2)
                     Image(systemName: showTrend ? "chart.line.uptrend.xyaxis.circle.fill" : "chart.line.uptrend.xyaxis.circle")
+                        .font(.caption2)
+                    Text(trendDegree.map { trendLabel($0) } ?? "Trend")
                         .font(.caption2)
                 }
                 .foregroundStyle(showTrend ? .orange : .secondary)
@@ -658,10 +658,10 @@ struct ReadingChartView: View {
 
     private func trendLabel(_ degree: Int) -> String {
         switch degree {
-        case 1: return "Linear trend"
-        case 2: return "Quadratic trend"
-        case 3: return "Cubic trend"
-        default: return "Quartic trend"
+        case 1: return "Trend (linear)"
+        case 2: return "Trend (quadratic)"
+        case 3: return "Trend (cubic)"
+        default: return "Trend (quartic)"
         }
     }
 

@@ -57,11 +57,11 @@ extension View {
         let fmt: Date.FormatStyle = spansYears
             ? .dateTime.month(.abbreviated).day().year()
             : .dateTime.month(.abbreviated).day()
-        // Evenly-spaced intermediate gridlines — 3 divisions keeps spacing consistent
-        // regardless of where in history the user has scrolled.
-        let intermediates: [Date] = days > 2 ? (1...3).map { i in
-            visibleStart.addingTimeInterval(visibleSpan * Double(i) / 4)
-        } : []
+        let midpoint: Date? = days > 2 ? visibleStart.addingTimeInterval(visibleSpan / 2) : nil
+        let flanking: [Date] = days > 2 ? [
+            visibleStart.addingTimeInterval(visibleSpan / 4),
+            visibleStart.addingTimeInterval(visibleSpan * 3 / 4)
+        ] : []
         return self.chartXAxis {
             AxisMarks(values: [visibleStart, visibleEnd]) { value in
                 AxisGridLine()
@@ -71,8 +71,16 @@ extension View {
                     }
                 }
             }
-            if !intermediates.isEmpty {
-                AxisMarks(values: intermediates) {
+            if let midpoint {
+                AxisMarks(values: [midpoint]) { _ in
+                    AxisGridLine()
+                    AxisValueLabel(anchor: .top) {
+                        Text(midpoint.formatted(fmt)).font(.caption2)
+                    }
+                }
+            }
+            if !flanking.isEmpty {
+                AxisMarks(values: flanking) {
                     AxisGridLine()
                 }
             }

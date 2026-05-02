@@ -349,57 +349,73 @@ struct DoseChartView: View {
 
     var body: some View {
         VStack(spacing: 4) {
-            Chart {
-                ForEach(sorted) { e in
-                    PointMark(
-                        x: .value("Date", e.date),
-                        y: .value("Dose", e.dose)
-                    )
-                    .foregroundStyle(Color.orange)
-                    .symbolSize(50)
+            HStack(alignment: .center, spacing: 2) {
+                Text("Dose")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .fixedSize()
+                    .rotationEffect(.degrees(-90))
+                    .frame(width: 14)
 
-                    PointMark(
-                        x: .value("Date", e.date),
-                        y: .value("Time", normalizedTimeY(hourOfDay(e.date)))
-                    )
-                    .foregroundStyle(Color.teal.opacity(0.6))
-                    .symbol(.diamond)
-                    .symbolSize(30)
+                Chart {
+                    ForEach(sorted) { e in
+                        PointMark(
+                            x: .value("Date", e.date),
+                            y: .value("Dose", e.dose)
+                        )
+                        .foregroundStyle(Color.orange)
+                        .symbolSize(50)
+
+                        PointMark(
+                            x: .value("Date", e.date),
+                            y: .value("Time", normalizedTimeY(hourOfDay(e.date)))
+                        )
+                        .foregroundStyle(Color.teal.opacity(0.6))
+                        .symbol(.diamond)
+                        .symbolSize(30)
+                    }
                 }
-            }
-            .chartYScale(domain: yDomain)
-            .smartChartXAxis(visibleStart: visibleStart, visibleEnd: visibleEnd, visibleSpan: visibleSpan)
-            .chartYAxis {
-                AxisMarks(position: .leading, values: .automatic) { _ in
-                    AxisGridLine()
-                    AxisTick()
-                    AxisValueLabel()
-                }
-                AxisMarks(position: .trailing, values: timeAxisValues) { value in
-                    AxisTick()
-                    AxisValueLabel {
-                        if let v = value.as(Double.self) {
-                            let lo = yDomain.lowerBound
-                            let hi = yDomain.upperBound
-                            let hour = Int(((v - lo) / (hi - lo) * 24).rounded())
-                            Text(String(format: "%02d:00", hour))
-                                .font(.caption2)
+                .chartYScale(domain: yDomain)
+                .smartChartXAxis(visibleStart: visibleStart, visibleEnd: visibleEnd, visibleSpan: visibleSpan)
+                .chartYAxis {
+                    AxisMarks(position: .leading, values: .automatic) { _ in
+                        AxisGridLine()
+                        AxisTick()
+                        AxisValueLabel()
+                    }
+                    AxisMarks(position: .trailing, values: timeAxisValues) { value in
+                        AxisTick()
+                        AxisValueLabel {
+                            if let v = value.as(Double.self) {
+                                let lo = yDomain.lowerBound
+                                let hi = yDomain.upperBound
+                                let hour = Int(((v - lo) / (hi - lo) * 24).rounded())
+                                Text(String(format: "%02d:00", hour))
+                                    .font(.caption2)
+                            }
                         }
                     }
                 }
-            }
-            .chartScrollWindow(windowDuration: windowDuration, visibleSpan: visibleSpan, scrollDate: $scrollDate, anchorDate: anchorDate)
-            .onChange(of: scrollDate) { _, new in
-                debounceTask?.cancel()
-                debounceTask = Task { @MainActor in
-                    try? await Task.sleep(for: .milliseconds(300))
-                    guard !Task.isCancelled else { return }
-                    axisDate = new
-                    onScrollSettled(new)
+                .chartScrollWindow(windowDuration: windowDuration, visibleSpan: visibleSpan, scrollDate: $scrollDate, anchorDate: anchorDate)
+                .onChange(of: scrollDate) { _, new in
+                    debounceTask?.cancel()
+                    debounceTask = Task { @MainActor in
+                        try? await Task.sleep(for: .milliseconds(300))
+                        guard !Task.isCancelled else { return }
+                        axisDate = new
+                        onScrollSettled(new)
+                    }
                 }
-            }
-            .onChange(of: anchorDate) { _, new in
-                if let new { axisDate = new }
+                .onChange(of: anchorDate) { _, new in
+                    if let new { axisDate = new }
+                }
+
+                Text("Time")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .fixedSize()
+                    .rotationEffect(.degrees(90))
+                    .frame(width: 14)
             }
 
             if let wd = windowDuration, anchorDate == nil {

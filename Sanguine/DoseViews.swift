@@ -332,6 +332,21 @@ struct DoseChartView: View {
     }
     private var visibleSpan: TimeInterval { visibleEnd.timeIntervalSince(visibleStart) }
 
+    private func hourOfDay(_ date: Date) -> Double {
+        let cal = Calendar.current
+        return Double(cal.component(.hour, from: date)) + Double(cal.component(.minute, from: date)) / 60.0
+    }
+
+    private func normalizedTimeY(_ hour: Double) -> Double {
+        let lo = yDomain.lowerBound
+        let hi = yDomain.upperBound
+        return (hour / 24.0) * (hi - lo) + lo
+    }
+
+    private var timeAxisValues: [Double] {
+        [0.0, 6.0, 12.0, 18.0, 24.0].map { normalizedTimeY($0) }
+    }
+
     var body: some View {
         VStack(spacing: 4) {
             Chart {
@@ -342,12 +357,36 @@ struct DoseChartView: View {
                     )
                     .foregroundStyle(Color.orange)
                     .symbolSize(50)
+
+                    PointMark(
+                        x: .value("Date", e.date),
+                        y: .value("Time", normalizedTimeY(hourOfDay(e.date)))
+                    )
+                    .foregroundStyle(Color.teal.opacity(0.6))
+                    .symbol(.diamond)
+                    .symbolSize(30)
                 }
             }
             .chartYScale(domain: yDomain)
             .smartChartXAxis(visibleStart: visibleStart, visibleEnd: visibleEnd, visibleSpan: visibleSpan)
             .chartYAxis {
-                AxisMarks(position: .leading)
+                AxisMarks(position: .leading, values: .automatic) { _ in
+                    AxisGridLine()
+                    AxisTick()
+                    AxisValueLabel()
+                }
+                AxisMarks(position: .trailing, values: timeAxisValues) { value in
+                    AxisTick()
+                    AxisValueLabel {
+                        if let v = value.as(Double.self) {
+                            let lo = yDomain.lowerBound
+                            let hi = yDomain.upperBound
+                            let hour = Int(((v - lo) / (hi - lo) * 24).rounded())
+                            Text(String(format: "%02d:00", hour))
+                                .font(.caption2)
+                        }
+                    }
+                }
             }
             .chartScrollWindow(windowDuration: windowDuration, visibleSpan: visibleSpan, scrollDate: $scrollDate, anchorDate: anchorDate)
             .onChange(of: scrollDate) { _, new in

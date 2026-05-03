@@ -332,21 +332,6 @@ struct DoseChartView: View {
     }
     private var visibleSpan: TimeInterval { visibleEnd.timeIntervalSince(visibleStart) }
 
-    private func hourOfDay(_ date: Date) -> Double {
-        let cal = Calendar.current
-        return Double(cal.component(.hour, from: date)) + Double(cal.component(.minute, from: date)) / 60.0
-    }
-
-    private func normalizedTimeY(_ hour: Double) -> Double {
-        let lo = yDomain.lowerBound
-        let hi = yDomain.upperBound
-        return (hour / 24.0) * (hi - lo) + lo
-    }
-
-    private var timeAxisValues: [Double] {
-        [0.0, 6.0, 12.0, 18.0, 24.0].map { normalizedTimeY($0) }
-    }
-
     var body: some View {
         VStack(spacing: 4) {
             Chart {
@@ -357,35 +342,12 @@ struct DoseChartView: View {
                     )
                     .foregroundStyle(Color.orange)
                     .symbolSize(50)
-
-                    PointMark(
-                        x: .value("Date", e.date),
-                        y: .value("Time", normalizedTimeY(hourOfDay(e.date)))
-                    )
-                    .foregroundStyle(Color.teal.opacity(0.6))
-                    .symbol(.diamond)
-                    .symbolSize(30)
                 }
             }
             .chartYScale(domain: yDomain)
             .smartChartXAxis(visibleStart: visibleStart, visibleEnd: visibleEnd, visibleSpan: visibleSpan)
             .chartYAxis {
                 AxisMarks(position: .leading)
-            }
-            .chartOverlay { proxy in
-                GeometryReader { geo in
-                    ZStack(alignment: .topLeading) {
-                        ForEach([0, 6, 12, 18, 24], id: \.self) { hour in
-                            let yVal = normalizedTimeY(Double(hour))
-                            if let y = proxy.position(forY: yVal) {
-                                Text("\(hour):00")
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                                    .position(x: geo.size.width - 16, y: y)
-                            }
-                        }
-                    }
-                }
             }
             .chartScrollWindow(windowDuration: windowDuration, visibleSpan: visibleSpan, scrollDate: $scrollDate, anchorDate: anchorDate)
             .onChange(of: scrollDate) { _, new in

@@ -378,20 +378,19 @@ struct DoseChartView: View {
                 .chartYScale(domain: yDomain)
                 .smartChartXAxis(visibleStart: visibleStart, visibleEnd: visibleEnd, visibleSpan: visibleSpan)
                 .chartYAxis {
-                    AxisMarks(position: .leading, values: .automatic) { _ in
-                        AxisGridLine()
-                        AxisTick()
-                        AxisValueLabel()
-                    }
-                    AxisMarks(position: .trailing, values: timeAxisValues) { value in
-                        AxisTick()
-                        AxisValueLabel {
-                            if let v = value.as(Double.self) {
-                                let lo = yDomain.lowerBound
-                                let hi = yDomain.upperBound
-                                let hour = Int(((v - lo) / (hi - lo) * 24).rounded())
-                                Text(String(format: "%02d:00", hour))
-                                    .font(.caption2)
+                    AxisMarks(position: .leading)
+                }
+                .chartOverlay { proxy in
+                    GeometryReader { geo in
+                        ZStack(alignment: .topLeading) {
+                            ForEach([0, 6, 12, 18, 24], id: \.self) { hour in
+                                let yVal = normalizedTimeY(Double(hour))
+                                if let y = proxy.position(forY: yVal) {
+                                    Text(String(format: "%02d:00", hour))
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                        .position(x: geo.size.width - 16, y: y)
+                                }
                             }
                         }
                     }

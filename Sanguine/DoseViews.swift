@@ -349,72 +349,56 @@ struct DoseChartView: View {
 
     var body: some View {
         VStack(spacing: 4) {
-            HStack(alignment: .center, spacing: 2) {
-                Text("Dose")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .fixedSize()
-                    .rotationEffect(.degrees(-90))
-                    .frame(width: 14)
+            Chart {
+                ForEach(sorted) { e in
+                    PointMark(
+                        x: .value("Date", e.date),
+                        y: .value("Dose", e.dose)
+                    )
+                    .foregroundStyle(Color.orange)
+                    .symbolSize(50)
 
-                Chart {
-                    ForEach(sorted) { e in
-                        PointMark(
-                            x: .value("Date", e.date),
-                            y: .value("Dose", e.dose)
-                        )
-                        .foregroundStyle(Color.orange)
-                        .symbolSize(50)
-
-                        PointMark(
-                            x: .value("Date", e.date),
-                            y: .value("Time", normalizedTimeY(hourOfDay(e.date)))
-                        )
-                        .foregroundStyle(Color.teal.opacity(0.6))
-                        .symbol(.diamond)
-                        .symbolSize(30)
-                    }
+                    PointMark(
+                        x: .value("Date", e.date),
+                        y: .value("Time", normalizedTimeY(hourOfDay(e.date)))
+                    )
+                    .foregroundStyle(Color.teal.opacity(0.6))
+                    .symbol(.diamond)
+                    .symbolSize(30)
                 }
-                .chartYScale(domain: yDomain)
-                .smartChartXAxis(visibleStart: visibleStart, visibleEnd: visibleEnd, visibleSpan: visibleSpan)
-                .chartYAxis {
-                    AxisMarks(position: .leading)
-                }
-                .chartOverlay { proxy in
-                    GeometryReader { geo in
-                        ZStack(alignment: .topLeading) {
-                            ForEach([0, 6, 12, 18, 24], id: \.self) { hour in
-                                let yVal = normalizedTimeY(Double(hour))
-                                if let y = proxy.position(forY: yVal) {
-                                    Text(String(format: "%02d:00", hour))
-                                        .font(.caption2)
-                                        .foregroundStyle(.secondary)
-                                        .position(x: geo.size.width - 16, y: y)
-                                }
+            }
+            .chartYScale(domain: yDomain)
+            .smartChartXAxis(visibleStart: visibleStart, visibleEnd: visibleEnd, visibleSpan: visibleSpan)
+            .chartYAxis {
+                AxisMarks(position: .leading)
+            }
+            .chartOverlay { proxy in
+                GeometryReader { geo in
+                    ZStack(alignment: .topLeading) {
+                        ForEach([0, 6, 12, 18, 24], id: \.self) { hour in
+                            let yVal = normalizedTimeY(Double(hour))
+                            if let y = proxy.position(forY: yVal) {
+                                Text("\(hour):00")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                    .position(x: geo.size.width - 16, y: y)
                             }
                         }
                     }
                 }
-                .chartScrollWindow(windowDuration: windowDuration, visibleSpan: visibleSpan, scrollDate: $scrollDate, anchorDate: anchorDate)
-                .onChange(of: scrollDate) { _, new in
-                    debounceTask?.cancel()
-                    debounceTask = Task { @MainActor in
-                        try? await Task.sleep(for: .milliseconds(300))
-                        guard !Task.isCancelled else { return }
-                        axisDate = new
-                        onScrollSettled(new)
-                    }
+            }
+            .chartScrollWindow(windowDuration: windowDuration, visibleSpan: visibleSpan, scrollDate: $scrollDate, anchorDate: anchorDate)
+            .onChange(of: scrollDate) { _, new in
+                debounceTask?.cancel()
+                debounceTask = Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(300))
+                    guard !Task.isCancelled else { return }
+                    axisDate = new
+                    onScrollSettled(new)
                 }
-                .onChange(of: anchorDate) { _, new in
-                    if let new { axisDate = new }
-                }
-
-                Text("Time")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .fixedSize()
-                    .rotationEffect(.degrees(90))
-                    .frame(width: 14)
+            }
+            .onChange(of: anchorDate) { _, new in
+                if let new { axisDate = new }
             }
 
             if let wd = windowDuration, anchorDate == nil {

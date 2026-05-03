@@ -178,20 +178,20 @@ struct CSVImporter {
         if string.contains("T"), let d = isoDateTimeParser.date(from: string) {
             return d
         }
-        // Date-only strings: parse then set to 08:00 CET
+        // Date-only strings: parse then set to 18:00 CET
         for parser in parsers {
             if let d = parser.date(from: string) {
-                return dateAt8amCET(d)
+                return dateAt6pmCET(d)
             }
         }
         return nil
     }
 
-    private static func dateAt8amCET(_ date: Date) -> Date {
+    private static func dateAt6pmCET(_ date: Date) -> Date {
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = TimeZone(identifier: "Europe/Berlin") ?? .current
         var components = cal.dateComponents([.year, .month, .day], from: date)
-        components.hour = 8
+        components.hour = 18
         components.minute = 0
         components.second = 0
         return cal.date(from: components) ?? date

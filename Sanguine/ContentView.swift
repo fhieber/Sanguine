@@ -1,6 +1,8 @@
 import SwiftUI
+import SwiftData
 
 struct ContentView: View {
+    @Environment(\.modelContext) private var modelContext
     @State private var selectedTab = 1   // default: Doses tab
 
     var body: some View {
@@ -34,6 +36,9 @@ struct ContentView: View {
             default:
                 break
             }
+        }
+        .task {
+            migrateImportedDoseTimesIfNeeded(context: modelContext)
         }
     }
 }

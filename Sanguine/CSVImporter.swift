@@ -178,21 +178,28 @@ struct CSVImporter {
         if string.contains("T"), let d = isoDateTimeParser.date(from: string) {
             return d
         }
-        // Date-only strings: parse then set to 08:00 CET
+        // Date-only strings: parse then set to the user's configured reminder time.
         for parser in parsers {
             if let d = parser.date(from: string) {
-                return dateAt8amCET(d)
+                return dateAtReminderTime(d)
             }
         }
         return nil
     }
 
-    private static func dateAt8amCET(_ date: Date) -> Date {
+    /// Places a date-only entry at the user's configured dose reminder time
+    /// (defaults to 18:00 Europe/Berlin) so imports align with real intake patterns
+    /// rather than a hardcoded placeholder.
+    private static func dateAtReminderTime(_ date: Date) -> Date {
+        let store = UserDefaults.appGroup
+        let hour   = store.object(forKey: "doseTimeHour")   as? Int    ?? 18
+        let minute = store.object(forKey: "doseTimeMinute") as? Int    ?? 0
+        let tzID   = store.object(forKey: "doseTimezone")   as? String ?? "Europe/Berlin"
         var cal = Calendar(identifier: .gregorian)
-        cal.timeZone = TimeZone(identifier: "Europe/Berlin") ?? .current
+        cal.timeZone = TimeZone(identifier: tzID) ?? .current
         var components = cal.dateComponents([.year, .month, .day], from: date)
-        components.hour = 8
-        components.minute = 0
+        components.hour = hour
+        components.minute = minute
         components.second = 0
         return cal.date(from: components) ?? date
     }

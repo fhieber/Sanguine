@@ -438,3 +438,46 @@ struct DoseStats {
         }
     }
 }
+
+// MARK: - Migrations
+
+/// One-time backfill: CSV-imported doses originally landed at 08:00 Europe/Berlin
+/// (a placeholder, not a real intake time). This rewrites those specific entries
+/// to the user's configured reminder time so time-of-day stats are meaningful.
+///
+/// Only touches entries that satisfy BOTH:
+///   - `externalID != nil` (was created by CSV import)
+///   - wall-clock time in Europe/Berlin is exactly 08:00 (untouched placeholder)
+///
+/// Manually edited imports keep their user-set times; "Applied" doses (no externalID)
+/// are never touched. Runs at most once, gated by a UserDefaults flag.
+@MainActor
+func migrateImportedDoseTimesIfNeeded(context: ModelContext) {
+    let store = UserDefaults.appGroup
+    let flagKey = "didMigrateImportedDoseTimesV1"
+    guard !store.bool(forKey: flagKey) else { return }
+
+    var berlinCal = Calendar(identifier: .gregorian)
+    berlinCal.timeZone = TimeZone(identifier: "Europe/Berlin") ?? .current
+
+    let targetHour   = store.object(forKey: "doseTimeHour")   as? Int    ?? 18
+    let targetMinute = store.object(forKey: "doseTimeMinute") as? Int    ?? 0
+    let targetTZ     = store.object(forKey: "doseTimezone")   as? String ?? "Europe/Berlin"
+    var targetCal = Calendar(identifier: .gregorian)
+    targetCal.timeZone = TimeZone(identifier: targetTZ) ?? berlinCal.timeZone
+
+    let allDoses = (try? context.fetch(FetchDescriptor<DoseEntry>())) ?? []
+    for entry in allDoses where entry.externalID != nil {
+        let comps = berlinCal.dateComponents([.hour, .minute], from: entry.date)
+        guard comps.hour == 8, comps.minute == 0 else { continue }
+        var dayComps = targetCal.dateComponents([.year, .month, .day], from: entry.date)
+        dayComps.hour = targetHour
+        dayComps.minute = targetMinute
+        dayComps.second = 0
+        if let newDate = targetCal.date(from: dayComps) {
+            entry.date = newDate
+        }
+    }
+    try? context.save()
+    store.set(true, forKey: flagKey)
+}

@@ -345,6 +345,19 @@ struct ReadingTrend {
 
 struct DoseStats {
     let entries: [DoseEntry]
+    let reminderHour: Int
+    let reminderMinute: Int
+    let reminderTimezoneID: String
+
+    init(entries: [DoseEntry],
+         reminderHour: Int = 18,
+         reminderMinute: Int = 0,
+         reminderTimezoneID: String = "Europe/Berlin") {
+        self.entries = entries
+        self.reminderHour = reminderHour
+        self.reminderMinute = reminderMinute
+        self.reminderTimezoneID = reminderTimezoneID
+    }
 
     var count: Int { entries.count }
     var latest: DoseEntry? { entries.max(by: { $0.date < $1.date }) }
@@ -354,6 +367,44 @@ struct DoseStats {
     }
     var minimum: Double? { entries.map(\.dose).min() }
     var maximum: Double? { entries.map(\.dose).max() }
+
+    /// Per-entry time-of-day deviation from the reminder, in seconds (signed:
+    /// positive = AFTER the reminder, negative = before). Wrapped to ±12h to
+    /// handle reminders that fall near midnight.
+    private var reminderDeviations: [TimeInterval] {
+        var cal = Calendar.current
+        if let tz = TimeZone(identifier: reminderTimezoneID) { cal.timeZone = tz }
+        let reminderSec = TimeInterval(reminderHour * 3600 + reminderMinute * 60)
+        let halfDay: TimeInterval = 12 * 3600
+        let dayLength: TimeInterval = 24 * 3600
+        return entries.map { entry in
+            let comps = cal.dateComponents([.hour, .minute], from: entry.date)
+            let h = comps.hour ?? 0
+            let m = comps.minute ?? 0
+            let actualSec = TimeInterval(h * 3600 + m * 60)
+            var diff = actualSec - reminderSec
+            if diff > halfDay { diff -= dayLength }
+            else if diff < -halfDay { diff += dayLength }
+            return diff
+        }
+    }
+
+    /// Mean of `reminderDeviations`.
+    var averageReminderDeviation: TimeInterval? {
+        let devs = reminderDeviations
+        guard !devs.isEmpty else { return nil }
+        return devs.reduce(0, +) / Double(devs.count)
+    }
+
+    /// Sample standard deviation of `reminderDeviations` — how scattered
+    /// intake times are around the average offset. Needs at least 2 entries.
+    var intakeTimeStandardDeviation: TimeInterval? {
+        let devs = reminderDeviations
+        guard devs.count > 1 else { return nil }
+        let mean = devs.reduce(0, +) / Double(devs.count)
+        let variance = devs.map { pow($0 - mean, 2) }.reduce(0, +) / Double(devs.count - 1)
+        return sqrt(variance)
+    }
 
     /// Average total dose per complete calendar week. Boundary weeks that don't
     /// span a full Mon–Sun are discarded so partial weeks don't skew the average.

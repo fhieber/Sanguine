@@ -81,7 +81,12 @@ struct DoseTab: View {
         return historical
     }
 
-    private var stats: DoseStats { DoseStats(entries: filtered) }
+    private var stats: DoseStats {
+        DoseStats(entries: filtered,
+                  reminderHour: doseHour,
+                  reminderMinute: doseMinute,
+                  reminderTimezoneID: doseTimezoneID)
+    }
 
     private var dataRangeLabel: String {
         let start: Date
@@ -395,7 +400,10 @@ struct DoseStatsGrid: View {
     let stats: DoseStats
 
     var body: some View {
-        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+        LazyVGrid(
+            columns: [GridItem(.flexible()), GridItem(.flexible())],
+            spacing: 10
+        ) {
             StatCard(
                 title: "Average",
                 value: stats.average.map { String(format: "%.2f", $0) } ?? "—",
@@ -411,7 +419,34 @@ struct DoseStatsGrid: View {
                 value: stats.averageWeeklyTotal.map { String(format: "%.2f", $0) } ?? "—",
                 subtitle: stats.completeWeekCount > 0 ? "over \(stats.completeWeekCount) weeks" : nil
             )
+            StatCard(
+                title: "Avg Time Offset",
+                value: stats.averageReminderDeviation.map { formatDuration($0, signed: true) } ?? "—",
+                subtitle: "vs \(formatReminderTime(hour: stats.reminderHour, minute: stats.reminderMinute))"
+            )
+            StatCard(
+                title: "Time Spread",
+                value: stats.intakeTimeStandardDeviation.map { "±" + formatDuration($0, signed: false) } ?? "—",
+                subtitle: "around offset"
+            )
         }
+    }
+
+    /// Compact "Xh Ym" / "Ym" formatter; optional ± / − sign for signed values.
+    private func formatDuration(_ seconds: TimeInterval, signed: Bool) -> String {
+        let totalMinutes = Int(seconds.rounded() / 60)
+        if totalMinutes == 0 { return "0m" }
+        let sign = signed ? (totalMinutes > 0 ? "+" : "−") : ""
+        let absMin = abs(totalMinutes)
+        let h = absMin / 60
+        let m = absMin % 60
+        return h > 0 ? "\(sign)\(h)h \(m)m" : "\(sign)\(m)m"
+    }
+
+    private func formatReminderTime(hour: Int, minute: Int) -> String {
+        var comps = DateComponents(); comps.hour = hour; comps.minute = minute
+        let date = Calendar.current.date(from: comps) ?? .now
+        return date.formatted(date: .omitted, time: .shortened)
     }
 }
 

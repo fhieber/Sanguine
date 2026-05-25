@@ -415,19 +415,21 @@ struct AddReadingView: View {
                 }
             }
             .toolbar {
-                ToolbarItemGroup(placement: .keyboard) {
-                    if case .readingValue = focusedField {
-                        Spacer()
-                        Button("Done") { focusedField = nil }
-                    } else {
-                        let idx: Int = { if case .day(let i) = focusedField { return i }; return 0 }()
-                        Button("Previous") {
-                            if case .day(let i) = focusedField, i > 0 { focusedField = .day(i - 1) }
-                        }
-                        .disabled(idx == 0)
-                        Spacer()
-                        Button("Next") {
-                            if case .day(let i) = focusedField { addNextDay(after: i) }
+                ToolbarItem(placement: .keyboard) {
+                    HStack {
+                        if case .readingValue = focusedField {
+                            Spacer()
+                            Button("Done") { focusedField = nil }
+                        } else {
+                            let idx: Int = { if case .day(let i) = focusedField { return i }; return 0 }()
+                            Button("Previous") {
+                                if case .day(let i) = focusedField, i > 0 { focusedField = .day(i - 1) }
+                            }
+                            .disabled(idx == 0)
+                            Spacer()
+                            Button("Next") {
+                                if case .day(let i) = focusedField { addNextDay(after: i) }
+                            }
                         }
                     }
                 }
@@ -447,6 +449,11 @@ struct AddReadingView: View {
 
     private func setupDays() {
         days = buildPlannedDays(startingAt: Calendar.current.startOfDay(for: date), in: allDoses)
+        if !weeklySchedule.isEmpty {
+            while days.count < 7 {
+                appendNextDayIfNeeded(after: days.count - 1, days: &days, doses: allDoses)
+            }
+        }
         applyTemplate(weeklySchedule, to: &days)
     }
 

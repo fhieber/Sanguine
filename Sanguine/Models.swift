@@ -389,11 +389,16 @@ struct DoseStats {
         }
     }
 
-    /// Mean of `reminderDeviations`.
-    var averageReminderDeviation: TimeInterval? {
-        let devs = reminderDeviations
+    /// Median of `reminderDeviations` — less influenced by outliers than the mean.
+    var medianReminderDeviation: TimeInterval? {
+        let devs = reminderDeviations.sorted()
         guard !devs.isEmpty else { return nil }
-        return devs.reduce(0, +) / Double(devs.count)
+        let mid = devs.count / 2
+        if devs.count.isMultiple(of: 2) {
+            return (devs[mid - 1] + devs[mid]) / 2
+        } else {
+            return devs[mid]
+        }
     }
 
     /// Sample standard deviation of `reminderDeviations` — how scattered

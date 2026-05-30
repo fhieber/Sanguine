@@ -420,8 +420,8 @@ struct DoseStatsGrid: View {
                 subtitle: stats.completeWeekCount > 0 ? "over \(stats.completeWeekCount) weeks" : nil
             )
             StatCard(
-                title: "Avg Time Offset",
-                value: stats.averageReminderDeviation.map { formatDuration($0, signed: true) } ?? "—",
+                title: "Median Time Offset",
+                value: stats.medianReminderDeviation.map { formatDuration($0, signed: true) } ?? "—",
                 subtitle: "vs \(formatReminderTime(hour: stats.reminderHour, minute: stats.reminderMinute))"
             )
             StatCard(

@@ -472,6 +472,7 @@ struct AddReadingView: View {
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
             WidgetCenter.shared.reloadAllTimelines()
             NotificationManager.shared.removeDeliveredReadingReminder()
+            NotificationManager.shared.refreshReadingReminder(lastReadingDate: date)
             dismiss()
         } catch {
             saveError = error.localizedDescription

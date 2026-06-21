@@ -121,11 +121,12 @@ struct SettingsView: View {
                 Section {
                     Toggle("Reminder", isOn: $readingReminderEnabled)
                         .onChange(of: readingReminderEnabled) {
-                            NotificationManager.shared.updateReadingReminder(
+                            NotificationManager.shared.refreshReadingReminder(
                                 enabled: readingReminderEnabled,
                                 weekday: readingReminderWeekday,
                                 hour: readingReminderHour,
-                                minute: readingReminderMinute
+                                minute: readingReminderMinute,
+                                lastReadingDate: readings.last?.recordedAt
                             )
                         }
                     if readingReminderEnabled {
@@ -135,11 +136,12 @@ struct SettingsView: View {
                             }
                         }
                         .onChange(of: readingReminderWeekday) {
-                            NotificationManager.shared.updateReadingReminder(
+                            NotificationManager.shared.refreshReadingReminder(
                                 enabled: readingReminderEnabled,
                                 weekday: readingReminderWeekday,
                                 hour: readingReminderHour,
-                                minute: readingReminderMinute
+                                minute: readingReminderMinute,
+                                lastReadingDate: readings.last?.recordedAt
                             )
                         }
                         DatePicker("Time", selection: $readingReminderTime, displayedComponents: .hourAndMinute)
@@ -147,11 +149,12 @@ struct SettingsView: View {
                                 let c = Calendar.current.dateComponents([.hour, .minute], from: readingReminderTime)
                                 readingReminderHour   = c.hour   ?? 8
                                 readingReminderMinute = c.minute ?? 0
-                                NotificationManager.shared.updateReadingReminder(
+                                NotificationManager.shared.refreshReadingReminder(
                                     enabled: readingReminderEnabled,
                                     weekday: readingReminderWeekday,
                                     hour: readingReminderHour,
-                                    minute: readingReminderMinute
+                                    minute: readingReminderMinute,
+                                    lastReadingDate: readings.last?.recordedAt
                                 )
                             }
                     }

@@ -145,10 +145,9 @@ final class NotificationManager: Sendable {
 
     // MARK: - Reading Reminder
 
-    /// Schedules a weekly repeating reminder to take a reading.
-    /// weekday: 1 = Sunday … 7 = Saturday (matches Calendar.Component.weekday)
-    func scheduleReadingReminder(weekday: Int, hour: Int, minute: Int) {
-        cancelReadingReminder()
+    /// Builds and adds the reading reminder request for the given trigger,
+    /// always reusing the shared `readingReminderID` identifier.
+    private func addReadingReminderRequest(trigger: UNNotificationTrigger) {
         let content = UNMutableNotificationContent()
         content.title = "Time for your reading"
         content.body  = "Tap to record today's reading."
@@ -156,14 +155,51 @@ final class NotificationManager: Sendable {
         content.categoryIdentifier = Self.readingReminderID
         content.interruptionLevel  = .timeSensitive
 
+        let request = UNNotificationRequest(identifier: Self.readingReminderID, content: content, trigger: trigger)
+        UNUserNotificationCenter.current().add(request)
+    }
+
+    /// Cancels and reschedules the weekly reading reminder, skipping the
+    /// upcoming occurrence when a reading has already been recorded on that
+    /// same calendar day. Normally a weekly repeating trigger is installed;
+    /// when the imminent occurrence is skipped, a one-shot is scheduled for the
+    /// following week instead (the next launch re-arms the repeating trigger).
+    /// weekday: 1 = Sunday … 7 = Saturday (matches Calendar.Component.weekday)
+    func refreshReadingReminder(enabled: Bool, weekday: Int, hour: Int, minute: Int, lastReadingDate: Date?) {
+        cancelReadingReminder()
+        guard enabled else { return }
+
         var components = DateComponents()
         components.weekday = weekday
         components.hour    = hour
         components.minute  = minute
 
-        let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: true)
-        let request = UNNotificationRequest(identifier: Self.readingReminderID, content: content, trigger: trigger)
-        UNUserNotificationCenter.current().add(request)
+        let cal = Calendar.current
+        guard let nextFire = cal.nextDate(after: .now, matching: components, matchingPolicy: .nextTime) else { return }
+
+        // Same-day check — the analog of the dose "already done today" filter.
+        if let last = lastReadingDate, cal.isDate(last, inSameDayAs: nextFire),
+           let following = cal.date(byAdding: .weekOfYear, value: 1, to: nextFire) {
+            // Skip the imminent occurrence: one-shot for next week.
+            let oneShot = cal.dateComponents([.year, .month, .day, .hour, .minute], from: following)
+            addReadingReminderRequest(trigger: UNCalendarNotificationTrigger(dateMatching: oneShot, repeats: false))
+        } else {
+            // Normal: weekly repeating trigger.
+            addReadingReminderRequest(trigger: UNCalendarNotificationTrigger(dateMatching: components, repeats: true))
+        }
+    }
+
+    /// Convenience overload that reads the reminder settings from the shared
+    /// app group defaults, for callers without direct access to them.
+    func refreshReadingReminder(lastReadingDate: Date?) {
+        let d = UserDefaults.appGroup
+        refreshReadingReminder(
+            enabled: d.object(forKey: "readingReminderEnabled") as? Bool ?? true,
+            weekday: d.object(forKey: "readingReminderWeekday") as? Int ?? 1,
+            hour:    d.object(forKey: "readingReminderHour")    as? Int ?? 8,
+            minute:  d.object(forKey: "readingReminderMinute")  as? Int ?? 0,
+            lastReadingDate: lastReadingDate
+        )
     }
 
     func cancelReadingReminder() {
@@ -178,8 +214,4 @@ final class NotificationManager: Sendable {
             .removeDeliveredNotifications(withIdentifiers: [Self.readingReminderID])
     }
 
-    func updateReadingReminder(enabled: Bool, weekday: Int, hour: Int, minute: Int) {
-        if enabled { scheduleReadingReminder(weekday: weekday, hour: hour, minute: minute) }
-        else { cancelReadingReminder() }
-    }
 }
